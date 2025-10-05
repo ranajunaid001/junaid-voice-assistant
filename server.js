@@ -75,8 +75,8 @@ wss.on('connection', (ws) => {
                         audioBuffer.push(...data.data);
                         
                         // Process audio in chunks (every 1 second of audio)
-                        if (audioBuffer.length >= 16000) { // ~1 second at 16kHz
-                            processAudioChunk(ws, audioBuffer.splice(0, 16000));
+                        if (audioBuffer.length >= 32000) { // ~1 second at 16kHz
+                            processAudioChunk(ws, audioBuffer.splice(0, 32000));
                         }
                         
                         // Set timeout to process remaining audio
@@ -87,7 +87,7 @@ wss.on('connection', (ws) => {
                             if (audioBuffer.length > 0) {
                                 processAudioChunk(ws, audioBuffer.splice(0));
                             }
-                        }, 300); // Process after 300ms of silence
+                        }, 1000); // Process after 300ms of silence
                     }
                     break;
                     
