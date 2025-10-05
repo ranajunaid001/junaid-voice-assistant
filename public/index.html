@@ -387,6 +387,8 @@
                 processor.onaudioprocess = (e) => {
                     if (!isActive || !isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
                     
+                    console.log('Audio process fired!'); // ADD THIS LINE
+                    
                     const inputData = e.inputBuffer.getChannelData(0);
                     const outputData = new Int16Array(inputData.length);
                     
@@ -417,7 +419,7 @@
                 };
                 
                 source.connect(processor);
-                // Don't connect to destination to avoid echo
+                processor.connect(audioContext.destination);
                 
                 instruction.textContent = 'Click to start conversation';
                 console.log('Audio initialized successfully');
