@@ -225,8 +225,6 @@
         let isConnected = false;
         let isActive = false;
         let currentAudio = null;
-        let audioQueue = [];
-        let isPlayingAudio = false;
 
         const orb = document.getElementById('orb');
         const status = document.getElementById('status');
@@ -247,9 +245,10 @@
 
         // Initialize WebSocket connection
         function connectWebSocket() {
+            // Update this to your Railway WebSocket URL
             const wsUrl = window.location.protocol === 'https:' 
-                ? `wss://${window.location.host}`
-                : `ws://${window.location.host}`;
+                ? `wss://${window.location.host}/ws`
+                : `ws://${window.location.host}/ws`;
 
             ws = new WebSocket(wsUrl);
 
@@ -297,12 +296,7 @@
                     break;
                 
                 case 'audio':
-                    if (isPlayingAudio) {
-                        // Queue the audio if already playing
-                        audioQueue.push(data);
-                    } else {
-                        playAudioChunk(data);
-                    }
+                    playAudioChunk(data);
                     break;
                 
                 case 'state':
@@ -311,29 +305,15 @@
                     
                 case 'command':
                     if (data.action === 'stopAudio') {
-                        stopAllAudio();
+                        // Stop current audio
+                        if (currentAudio) {
+                            currentAudio.pause();
+                            currentAudio = null;
+                        }
                         console.log('Audio playback stopped due to interruption');
                     }
                     break;
             }
-        }
-
-        // Stop all audio playback
-        function stopAllAudio() {
-            // Stop current audio
-            if (currentAudio) {
-                currentAudio.pause();
-                currentAudio.currentTime = 0;
-                currentAudio = null;
-            }
-            
-            // Clear audio queue
-            audioQueue = [];
-            isPlayingAudio = false;
-            
-            // Update UI to listening state
-            orb.className = 'orb connected listening';
-            status.textContent = 'Listening';
         }
 
         // Add message to transcript
@@ -365,7 +345,6 @@
                     orb.classList.add('listening');
                     status.textContent = 'Listening';
                     visualizer.classList.add('active');
-                    isPlayingAudio = false;
                     break;
                 
                 case 'processing':
@@ -382,7 +361,6 @@
                 case 'idle':
                     status.textContent = 'Ready';
                     visualizer.classList.remove('active');
-                    isPlayingAudio = false;
                     break;
             }
         }
@@ -396,16 +374,19 @@
                         sampleRate: 16000,
                         channelCount: 1,
                         echoCancellation: true,
-                        noiseSuppression: true,
-                        autoGainControl: true
+                        noiseSuppression: true
                     } 
                 });
                 
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 processor = audioContext.createScriptProcessor(2048, 1, 1);
                 
+                let messageCount = 0;
+                
                 processor.onaudioprocess = (e) => {
                     if (!isActive || !isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
+                    
+                    console.log('Audio process fired!'); // ADD THIS LINE
                     
                     const inputData = e.inputBuffer.getChannelData(0);
                     const outputData = new Int16Array(inputData.length);
@@ -422,6 +403,12 @@
                             type: 'audio',
                             data: Array.from(outputData)
                         }));
+                        
+                        // Debug log every 50th message
+                        messageCount++;
+                        if (messageCount % 50 === 0) {
+                            console.log(`Sent ${messageCount} audio chunks`);
+                        }
                     } catch (error) {
                         console.error('Error sending audio:', error);
                     }
@@ -457,7 +444,11 @@
         // Play audio chunk from server
         async function playAudioChunk(audioData) {
             try {
-                isPlayingAudio = true;
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
                 
                 // Convert base64 to blob
                 const binaryString = atob(audioData.data);
@@ -471,35 +462,18 @@
                 
                 // Create and play audio
                 currentAudio = new Audio(url);
+                currentAudio.play();
                 
-                // Handle audio end
+                // Clean up when audio ends
                 currentAudio.addEventListener('ended', () => {
                     URL.revokeObjectURL(url);
                     currentAudio = null;
-                    isPlayingAudio = false;
-                    
-                    // Play next audio in queue if any
-                    if (audioQueue.length > 0) {
-                        const nextAudio = audioQueue.shift();
-                        playAudioChunk(nextAudio);
-                    }
                 });
                 
-                // Handle audio errors
-                currentAudio.addEventListener('error', (e) => {
-                    console.error('Audio playback error:', e);
-                    URL.revokeObjectURL(url);
-                    currentAudio = null;
-                    isPlayingAudio = false;
-                });
-                
-                await currentAudio.play();
                 console.log('Playing TTS audio');
-                
             } catch (error) {
                 console.error('Error playing audio:', error);
                 currentAudio = null;
-                isPlayingAudio = false;
             }
         }
 
@@ -525,7 +499,6 @@
                 console.log('Stopping conversation');
                 ws.send(JSON.stringify({ type: 'stop' }));
                 instruction.textContent = 'Click to start conversation';
-                stopAllAudio();
             }
         }
 
