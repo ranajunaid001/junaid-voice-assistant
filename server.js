@@ -38,8 +38,8 @@ const googleTTSClient = new textToSpeech.TextToSpeechClient({
 let ttsConfig = {
     service: 'google',  // 'aws' or 'google' - changed to google as default
     awsVoice: 'Stephen',  // AWS Polly voice
-    googleVoice: 'Enceladus',  // Google Gemini-TTS voice
-    googleModel: 'gemini-2.5-flash-tts'  // 'gemini-2.5-flash-tts' or 'gemini-2.5-pro-tts'
+    googleVoice: 'en-US-Neural2-D',  // Google TTS voice (not Gemini)
+    googleModel: 'neural2'  // Standard Google TTS model
 };
 
 // Available voices configuration
@@ -51,10 +51,10 @@ const availableVoices = {
         'Joanna': { gender: 'Female', engine: 'neural' }
     },
     google: {
-        'Enceladus': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
-        'Aoede': { gender: 'Female', model: 'gemini-2.5-flash-tts' },
-        'Schedar': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
-        'Umbriel': { gender: 'Male', model: 'gemini-2.5-flash-tts' }
+        'en-US-Neural2-D': { gender: 'Male', type: 'Neural2' },
+        'en-US-Neural2-F': { gender: 'Female', type: 'Neural2' },
+        'en-US-Journey-D': { gender: 'Male', type: 'Journey' },
+        'en-US-Journey-F': { gender: 'Female', type: 'Journey' }
     }
 };
 
@@ -355,6 +355,7 @@ async function googleTextToSpeech(text) {
             model: ttsConfig.googleModel
         });
         
+        // According to the documentation, the correct structure is:
         const request = {
             input: { 
                 text: text,
@@ -362,8 +363,8 @@ async function googleTextToSpeech(text) {
             },
             voice: {
                 languageCode: 'en-US',
-                name: ttsConfig.googleVoice,
-                modelName: ttsConfig.googleModel  // Changed to camelCase
+                name: ttsConfig.googleVoice,  // e.g., "Enceladus"
+                modelName: ttsConfig.googleModel  // e.g., "gemini-2.5-flash-tts"
             },
             audioConfig: {
                 audioEncoding: 'MP3'
@@ -391,6 +392,7 @@ async function googleTextToSpeech(text) {
         console.error('Google TTS error:', error.message);
         console.error('Error code:', error.code);
         console.error('Error details:', error.details);
+        console.error('Full error:', error);
         return null;
     }
 }
