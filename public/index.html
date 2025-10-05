@@ -26,11 +26,12 @@
         .container {
             text-align: center;
             padding: 40px;
+            max-width: 600px;
         }
 
         .orb {
-            width: 80px;
-            height: 80px;
+            width: 120px;
+            height: 120px;
             margin: 0 auto 40px;
             background: #000000;
             border-radius: 50%;
@@ -48,38 +49,37 @@
             width: 0;
             height: 0;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
+            background: rgba(255, 255, 255, 0.1);
             transform: translate(-50%, -50%);
-            transition: width 0.6s, height 0.6s;
+            transition: all 0.6s;
         }
 
-        .orb:hover {
-            transform: scale(1.05);
+        .orb.connected {
+            background: #007AFF;
         }
 
-        .orb:active {
-            transform: scale(0.98);
+        .orb.listening {
+            background: #34C759;
         }
 
-        .orb.recording {
-            background: #FF3B30;
+        .orb.speaking {
+            background: #5856D6;
         }
 
-        .orb.recording::before {
-            width: 300%;
-            height: 300%;
-            animation: ripple 1.5s ease-out infinite;
+        .orb.listening::before,
+        .orb.speaking::before {
+            animation: pulse 1.5s ease-out infinite;
         }
 
-        @keyframes ripple {
+        @keyframes pulse {
             0% {
                 width: 0;
                 height: 0;
-                opacity: 0.5;
+                opacity: 0.8;
             }
             100% {
-                width: 300%;
-                height: 300%;
+                width: 200%;
+                height: 200%;
                 opacity: 0;
             }
         }
@@ -101,194 +101,342 @@
             margin-bottom: 60px;
         }
 
-        .debug {
-            position: fixed;
-            bottom: 40px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #F2F2F7;
-            padding: 12px 20px;
-            border-radius: 20px;
-            font-size: 12px;
-            color: #3C3C43;
-            font-family: 'SF Mono', monospace;
-            max-width: 90%;
-            opacity: 0;
-            transition: opacity 0.3s;
-        }
-
-        .debug.show {
-            opacity: 1;
-        }
-
-        /* Minimalist animation */
-        .wave {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
+        /* Waveform visualization */
+        .visualizer {
+            width: 300px;
             height: 60px;
+            margin: 0 auto 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
             opacity: 0;
             transition: opacity 0.3s;
         }
 
-        .wave.active {
+        .visualizer.active {
             opacity: 1;
         }
 
-        .wave-path {
-            stroke: #000000;
-            stroke-width: 2;
-            fill: none;
-            stroke-linecap: round;
+        .bar {
+            width: 3px;
+            background: #000000;
+            border-radius: 2px;
+            transition: height 0.1s ease;
+        }
+
+        /* Connection state */
+        .connection-indicator {
+            position: fixed;
+            top: 40px;
+            right: 40px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #8E8E93;
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #8E8E93;
+            transition: background 0.3s;
+        }
+
+        .connection-dot.connected {
+            background: #34C759;
+        }
+
+        /* Transcript */
+        .transcript {
+            margin-top: 40px;
+            padding: 20px;
+            background: #F2F2F7;
+            border-radius: 12px;
+            min-height: 100px;
+            text-align: left;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #000000;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .transcript.show {
+            opacity: 1;
+        }
+
+        .transcript-label {
+            font-size: 11px;
+            color: #8E8E93;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .message {
+            margin: 8px 0;
+            padding: 8px 12px;
+            border-radius: 8px;
+        }
+
+        .message.user {
+            background: #007AFF;
+            color: white;
+            margin-left: 40px;
+            text-align: right;
+        }
+
+        .message.assistant {
+            background: white;
+            margin-right: 40px;
         }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="connection-indicator">
+            <div class="connection-dot" id="connectionDot"></div>
+            <span id="connectionText">Disconnected</span>
+        </div>
+
         <div class="status" id="status">Initializing</div>
-        <div class="instruction">Press and hold to speak</div>
+        <div class="instruction" id="instruction">Click to start conversation</div>
         
         <div class="orb" id="orb"></div>
         
-        <svg class="wave" id="wave" viewBox="0 0 1200 60" preserveAspectRatio="none">
-            <path class="wave-path" d="M0,30 Q300,10 600,30 T1200,30" />
-        </svg>
+        <div class="visualizer" id="visualizer">
+            <!-- Audio bars will be inserted here -->
+        </div>
+
+        <div class="transcript" id="transcript">
+            <div class="transcript-label">Conversation</div>
+            <div id="messages"></div>
+        </div>
     </div>
 
-    <div class="debug" id="debug"></div>
-
     <script>
-        let mediaRecorder;
-        let audioChunks = [];
-        let isRecording = false;
-        
+        let ws = null;
+        let audioContext = null;
+        let mediaStream = null;
+        let processor = null;
+        let isConnected = false;
+        let isActive = false;
+
         const orb = document.getElementById('orb');
         const status = document.getElementById('status');
-        const debug = document.getElementById('debug');
-        const wave = document.getElementById('wave');
-        
-        // Initialize
-        async function init() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-                
-                mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
-                        audioChunks.push(event.data);
-                    }
-                };
-                
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-                    audioChunks = [];
-                    
-                    // Show debug info
-                    showDebug(`Audio recorded: ${(audioBlob.size / 1024).toFixed(1)}KB`);
-                    
-                    // TODO: Send to server
-                    status.textContent = 'Processing';
-                    
-                    // Simulate processing
-                    setTimeout(() => {
-                        status.textContent = 'Ready';
-                    }, 1000);
-                };
-                
+        const instruction = document.getElementById('instruction');
+        const connectionDot = document.getElementById('connectionDot');
+        const connectionText = document.getElementById('connectionText');
+        const visualizer = document.getElementById('visualizer');
+        const transcript = document.getElementById('transcript');
+        const messages = document.getElementById('messages');
+
+        // Create visualizer bars
+        for (let i = 0; i < 40; i++) {
+            const bar = document.createElement('div');
+            bar.className = 'bar';
+            bar.style.height = '4px';
+            visualizer.appendChild(bar);
+        }
+
+        // Initialize WebSocket connection
+        function connectWebSocket() {
+            // Update this to your Railway WebSocket URL
+            const wsUrl = window.location.protocol === 'https:' 
+                ? `wss://${window.location.host}/ws`
+                : `ws://${window.location.host}/ws`;
+
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                isConnected = true;
+                connectionDot.classList.add('connected');
+                connectionText.textContent = 'Connected';
                 status.textContent = 'Ready';
+                orb.classList.add('connected');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleServerMessage(data);
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket error:', error);
+                status.textContent = 'Connection error';
+            };
+
+            ws.onclose = () => {
+                console.log('WebSocket disconnected');
+                isConnected = false;
+                connectionDot.classList.remove('connected');
+                connectionText.textContent = 'Disconnected';
+                status.textContent = 'Disconnected';
+                orb.classList.remove('connected', 'listening', 'speaking');
+                
+                // Reconnect after 3 seconds
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // Handle messages from server
+        function handleServerMessage(data) {
+            switch (data.type) {
+                case 'transcript':
+                    addMessage(data.text, 'user', data.final);
+                    break;
+                
+                case 'response':
+                    addMessage(data.text, 'assistant');
+                    break;
+                
+                case 'audio':
+                    playAudioChunk(data.audio);
+                    break;
+                
+                case 'state':
+                    updateState(data.state);
+                    break;
+            }
+        }
+
+        // Add message to transcript
+        function addMessage(text, sender, isFinal = true) {
+            transcript.classList.add('show');
+            
+            let lastMessage = messages.lastElementChild;
+            
+            if (!isFinal && lastMessage && lastMessage.dataset.sender === sender) {
+                // Update existing message
+                lastMessage.textContent = text;
+            } else {
+                // Create new message
+                const message = document.createElement('div');
+                message.className = `message ${sender}`;
+                message.dataset.sender = sender;
+                message.textContent = text;
+                messages.appendChild(message);
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+
+        // Update UI state
+        function updateState(state) {
+            orb.className = 'orb connected';
+            
+            switch (state) {
+                case 'listening':
+                    orb.classList.add('listening');
+                    status.textContent = 'Listening';
+                    visualizer.classList.add('active');
+                    break;
+                
+                case 'processing':
+                    status.textContent = 'Processing';
+                    visualizer.classList.remove('active');
+                    break;
+                
+                case 'speaking':
+                    orb.classList.add('speaking');
+                    status.textContent = 'Speaking';
+                    visualizer.classList.add('active');
+                    break;
+                
+                case 'idle':
+                    status.textContent = 'Ready';
+                    visualizer.classList.remove('active');
+                    break;
+            }
+        }
+
+        // Initialize audio context and microphone
+        async function initAudio() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                
+                const source = audioContext.createMediaStreamSource(mediaStream);
+                processor = audioContext.createScriptProcessor(2048, 1, 1);
+                
+                processor.onaudioprocess = (e) => {
+                    if (!isActive || !isConnected) return;
+                    
+                    const inputData = e.inputBuffer.getChannelData(0);
+                    const outputData = new Int16Array(inputData.length);
+                    
+                    // Convert float32 to int16
+                    for (let i = 0; i < inputData.length; i++) {
+                        outputData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                    }
+                    
+                    // Send audio data via WebSocket
+                    ws.send(JSON.stringify({
+                        type: 'audio',
+                        data: Array.from(outputData)
+                    }));
+                    
+                    // Update visualizer
+                    updateVisualizer(inputData);
+                };
+                
+                source.connect(processor);
+                processor.connect(audioContext.destination);
+                
+                instruction.textContent = 'Click to start conversation';
                 
             } catch (error) {
+                console.error('Error initializing audio:', error);
                 status.textContent = 'Microphone access required';
-                showDebug(`Error: ${error.message}`);
             }
         }
-        
-        // Show debug info
-        function showDebug(message) {
-            debug.textContent = message;
-            debug.classList.add('show');
-            setTimeout(() => {
-                debug.classList.remove('show');
-            }, 3000);
-        }
-        
-        // Start recording
-        function startRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'inactive') {
-                audioChunks = [];
-                mediaRecorder.start();
-                isRecording = true;
-                orb.classList.add('recording');
-                wave.classList.add('active');
-                status.textContent = 'Listening';
-                
-                // Animate wave
-                animateWave();
-            }
-        }
-        
-        // Stop recording
-        function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
-                isRecording = false;
-                orb.classList.remove('recording');
-                wave.classList.remove('active');
-                status.textContent = 'Processing';
-            }
-        }
-        
-        // Wave animation
-        function animateWave() {
-            if (!isRecording) return;
+
+        // Update audio visualizer
+        function updateVisualizer(data) {
+            const bars = visualizer.querySelectorAll('.bar');
+            const step = Math.floor(data.length / bars.length);
             
-            const path = document.querySelector('.wave-path');
-            const time = Date.now() / 1000;
-            
-            let d = 'M0,30 ';
-            for (let x = 0; x <= 1200; x += 50) {
-                const y = 30 + Math.sin((x / 200) + time) * 10 * Math.random();
-                d += `${x === 0 ? 'M' : 'L'}${x},${y} `;
+            for (let i = 0; i < bars.length; i++) {
+                const value = Math.abs(data[i * step]);
+                const height = Math.max(4, Math.min(60, value * 200));
+                bars[i].style.height = `${height}px`;
             }
-            
-            path.setAttribute('d', d);
-            requestAnimationFrame(animateWave);
         }
-        
+
+        // Play audio chunk from server
+        function playAudioChunk(audioData) {
+            // This is a placeholder - you'll need to implement audio playback
+            // based on the format you receive from the server
+            console.log('Received audio chunk');
+        }
+
+        // Toggle conversation
+        function toggleConversation() {
+            if (!isConnected || !audioContext) return;
+            
+            isActive = !isActive;
+            
+            if (isActive) {
+                ws.send(JSON.stringify({ type: 'start' }));
+                instruction.textContent = 'Click to stop';
+            } else {
+                ws.send(JSON.stringify({ type: 'stop' }));
+                instruction.textContent = 'Click to start conversation';
+            }
+        }
+
         // Event listeners
-        orb.addEventListener('mousedown', startRecording);
-        orb.addEventListener('mouseup', stopRecording);
-        orb.addEventListener('mouseleave', stopRecording);
-        
-        // Touch support
-        orb.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startRecording();
-        });
-        
-        orb.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            stopRecording();
-        });
-        
-        // Initialize on load
-        init();
-        
-        // Keyboard support
-        document.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' && !isRecording) {
-                e.preventDefault();
-                startRecording();
-            }
-        });
-        
-        document.addEventListener('keyup', (e) => {
-            if (e.code === 'Space' && isRecording) {
-                e.preventDefault();
-                stopRecording();
-            }
-        });
+        orb.addEventListener('click', toggleConversation);
+
+        // Initialize
+        connectWebSocket();
+        initAudio();
+
+        // Show initializing state
+        status.textContent = 'Initializing';
     </script>
 </body>
 </html>
