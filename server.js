@@ -34,8 +34,27 @@ const googleTTSClient = new textToSpeech.TextToSpeechClient({
     credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS)
 });
 
-// TTS service selection (can be 'aws' or 'google')
-let ttsService = 'aws'; // Default to AWS
+// TTS configuration - stores current settings
+let ttsConfig = {
+    service: 'aws',  // 'aws' or 'google'
+    awsVoice: 'Stephen',  // AWS Polly voice
+    googleVoice: 'Enceladus',  // Google Gemini-TTS voice
+    googleModel: 'gemini-2.5-flash-tts'  // 'gemini-2.5-flash-tts' or 'gemini-2.5-pro-tts'
+};
+
+// Available voices configuration
+const availableVoices = {
+    aws: {
+        'Stephen': { gender: 'Male', engine: 'generative' },
+        'Ruth': { gender: 'Female', engine: 'generative' }
+    },
+    google: {
+        'Enceladus': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
+        'Aoede': { gender: 'Female', model: 'gemini-2.5-flash-tts' },
+        'Schedar': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
+        'Umbriel': { gender: 'Male', model: 'gemini-2.5-flash-tts' }
+    }
+};
 
 // Serve static files
 app.use(express.static('public'));
@@ -43,6 +62,14 @@ app.use(express.static('public'));
 // Basic health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', connections: wss.clients.size });
+});
+
+// Get available voices endpoint
+app.get('/api/voices', (req, res) => {
+    res.json({
+        currentConfig: ttsConfig,
+        availableVoices: availableVoices
+    });
 });
 
 // WebSocket connection handler
@@ -55,10 +82,11 @@ wss.on('connection', (ws) => {
     let transcriptionTimeout = null;
     let isSpeaking = false;
     
-    // Send initial state
+    // Send initial state with TTS config
     ws.send(JSON.stringify({
         type: 'state',
-        state: 'idle'
+        state: 'idle',
+        ttsConfig: ttsConfig
     }));
     
     // Handle incoming messages
@@ -91,13 +119,32 @@ wss.on('connection', (ws) => {
                     break;
                     
                 case 'setTTS':
-                    // Handle TTS service change
-                    if (data.service === 'aws' || data.service === 'google') {
-                        ttsService = data.service;
-                        console.log('TTS service changed to:', ttsService);
+                    // Handle TTS configuration changes
+                    if (data.config) {
+                        // Update service
+                        if (data.config.service && (data.config.service === 'aws' || data.config.service === 'google')) {
+                            ttsConfig.service = data.config.service;
+                        }
+                        
+                        // Update AWS voice
+                        if (data.config.awsVoice && availableVoices.aws[data.config.awsVoice]) {
+                            ttsConfig.awsVoice = data.config.awsVoice;
+                        }
+                        
+                        // Update Google voice
+                        if (data.config.googleVoice && availableVoices.google[data.config.googleVoice]) {
+                            ttsConfig.googleVoice = data.config.googleVoice;
+                        }
+                        
+                        // Update Google model
+                        if (data.config.googleModel && (data.config.googleModel === 'gemini-2.5-flash-tts' || data.config.googleModel === 'gemini-2.5-pro-tts')) {
+                            ttsConfig.googleModel = data.config.googleModel;
+                        }
+                        
+                        console.log('TTS configuration updated:', ttsConfig);
                         ws.send(JSON.stringify({
-                            type: 'ttsChanged',
-                            service: ttsService
+                            type: 'ttsConfigUpdated',
+                            ttsConfig: ttsConfig
                         }));
                     }
                     break;
@@ -252,7 +299,7 @@ async function transcribeAudio(audioBuffer) {
 
 // Text-to-Speech router function
 async function textToSpeechRouter(text) {
-    if (ttsService === 'google') {
+    if (ttsConfig.service === 'google') {
         return await googleTextToSpeech(text);
     } else {
         return await awsTextToSpeech(text);
@@ -262,14 +309,14 @@ async function textToSpeechRouter(text) {
 // AWS Polly Text-to-Speech
 async function awsTextToSpeech(text) {
     try {
-        console.log('Calling Amazon Polly TTS with:', text.substring(0, 50) + '...');
+        console.log(`Calling Amazon Polly TTS (${ttsConfig.awsVoice}) with:`, text.substring(0, 50) + '...');
         
         const params = {
             Text: text,
             OutputFormat: 'mp3',
-            VoiceId: 'Stephen', // or 'Ruth' - these support Generative
-            SampleRate: '24000', // Generative default
-            Engine: 'generative' // Most expressive voice
+            VoiceId: ttsConfig.awsVoice,
+            SampleRate: '24000',
+            Engine: 'generative'
         };
         
         const command = new SynthesizeSpeechCommand(params);
@@ -284,7 +331,6 @@ async function awsTextToSpeech(text) {
         
         console.log('Polly TTS audio received (MP3), size:', audioBuffer.length);
         
-        // Return MP3 directly - browser can play it
         return audioBuffer;
         
     } catch (error) {
@@ -293,17 +339,20 @@ async function awsTextToSpeech(text) {
     }
 }
 
-// Google Cloud Text-to-Speech
+// Google Cloud Text-to-Speech with Gemini-TTS
 async function googleTextToSpeech(text) {
     try {
-        console.log('Calling Google TTS with:', text.substring(0, 50) + '...');
+        console.log(`Calling Google Gemini-TTS (${ttsConfig.googleVoice}) with:`, text.substring(0, 50) + '...');
         
         const request = {
-            input: { text: text },
+            input: { 
+                text: text,
+                prompt: "You are having a friendly conversation. Speak naturally and conversationally."
+            },
             voice: {
                 languageCode: 'en-US',
-                name: 'en-US-Journey-D', // Male voice similar to Stephen
-                ssmlGender: 'MALE'
+                name: ttsConfig.googleVoice,
+                model: ttsConfig.googleModel
             },
             audioConfig: {
                 audioEncoding: 'MP3'
@@ -313,7 +362,7 @@ async function googleTextToSpeech(text) {
         const [response] = await googleTTSClient.synthesizeSpeech(request);
         const audioBuffer = Buffer.from(response.audioContent, 'base64');
         
-        console.log('Google TTS audio received (MP3), size:', audioBuffer.length);
+        console.log('Gemini-TTS audio received (MP3), size:', audioBuffer.length);
         
         return audioBuffer;
         
@@ -483,4 +532,6 @@ async function processAudioChunk(ws, audioData) {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
+    console.log('TTS Configuration:', ttsConfig);
+    console.log('Available voices:', availableVoices);
 });
