@@ -771,8 +771,9 @@
                 try {
                     await window.pendingAudio.play();
                     window.pendingAudio = null;
+                    console.log('Played queued audio');
                 } catch (e) {
-                    console.log('Pending audio play failed:', e);
+                    console.log('Queued audio play failed:', e);
                 }
             }
             
@@ -793,6 +794,17 @@
                 console.log('Stopping conversation');
                 ws.send(JSON.stringify({ type: 'stop' }));
                 instruction.textContent = 'Click to start conversation';
+                
+                // Also try to play pending audio when stopping
+                if (window.pendingAudio) {
+                    try {
+                        await window.pendingAudio.play();
+                        window.pendingAudio = null;
+                        console.log('Played queued audio on stop');
+                    } catch (e) {
+                        console.log('Stop: queued audio play failed:', e);
+                    }
+                }
             }
         }
 
