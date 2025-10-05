@@ -1,4 +1,20 @@
-const express = require('express');
+// Get LLM response
+            const llmResponse = await getLLMResponse(transcript);
+            
+            // Send LLM response
+            ws.send(JSON.stringify({
+                type: 'response',
+                text: llmResponse
+            }));
+            
+            // Try TTS (experimental)
+            console.log('Testing TTS with PlayAI...');
+            // For now, let's just log that we would do TTS here
+            // TODO: Implement actual TTS once we figure out the API
+            
+            ws.send(JSON.stringify({
+                type: 'state',
+                state: 'listeningconst express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
@@ -184,6 +200,42 @@ async function transcribeAudio(audioBuffer) {
     }
 }
 
+// Call Groq TTS
+async function textToSpeech(text) {
+    try {
+        console.log('Calling PlayAI TTS with:', text.substring(0, 50) + '...');
+        
+        const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'playai-tts',
+                voice: 'Chip-PlayAI'  // You can change this voice
+                input: text,
+                response_format: 'wav'
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`TTS API error: ${response.status} - ${error}`);
+        }
+        
+        // Get audio as buffer
+        const audioBuffer = await response.buffer();
+        console.log('TTS audio received, size:', audioBuffer.length);
+        
+        return audioBuffer;
+        
+    } catch (error) {
+        console.error('TTS error:', error);
+        return null;
+    }
+}
+
 // Call Groq LLM for response
 async function getLLMResponse(transcript) {
     try {
@@ -196,7 +248,7 @@ async function getLLMResponse(transcript) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'llama-3.3-70b-versatile',
+                model: 'llama-3.1-70b-versatile',
                 messages: [
                     {
                         role: 'system',
@@ -224,6 +276,44 @@ async function getLLMResponse(transcript) {
     } catch (error) {
         console.error('LLM error:', error);
         return "I'm sorry, I couldn't process that. Please try again.";
+    }
+}
+
+// Call Groq TTS
+async function textToSpeech(text) {
+    try {
+        console.log('Calling PlayAI TTS with:', text);
+        
+        // Try using it as a completion endpoint first
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'playai-tts',
+                messages: [
+                    {
+                        role: 'user',
+                        content: text
+                    }
+                ]
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`TTS API error: ${response.status} - ${error}`);
+        }
+        
+        const data = await response.json();
+        console.log('TTS response:', data);
+        return data;
+        
+    } catch (error) {
+        console.error('TTS error:', error);
+        return null;
     }
 }
 
@@ -258,12 +348,32 @@ async function processAudioChunk(ws, audioData) {
             // Get LLM response
             const llmResponse = await getLLMResponse(transcript);
             
-            // Send LLM response
+            // Send LLM response text
             ws.send(JSON.stringify({
                 type: 'response',
                 text: llmResponse
             }));
             
+            // Update state to speaking
+            ws.send(JSON.stringify({
+                type: 'state',
+                state: 'speaking'
+            }));
+            
+            // Generate TTS audio
+            const audioBuffer = await textToSpeech(llmResponse);
+            
+            if (audioBuffer) {
+                // Send audio as base64
+                const audioBase64 = audioBuffer.toString('base64');
+                ws.send(JSON.stringify({
+                    type: 'audio',
+                    data: audioBase64,
+                    format: 'wav'
+                }));
+            }
+            
+            // Back to listening
             ws.send(JSON.stringify({
                 type: 'state',
                 state: 'listening'
