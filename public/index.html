@@ -1,211 +1,401 @@
-
 <!DOCTYPE html>
 <html lang="ur" dir="rtl">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پاکستان شکایات رجسٹریشن سسٹم</title>
+    <title>شکایات • Pakistan Complaint System</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
+        
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        :root {
+            /* Warm, sophisticated palette inspired by Pakistani architecture */
+            --primary: #2C1810;
+            --secondary: #7A5C47;
+            --accent: #D4724E;
+            --accent-hover: #C05A3A;
+            --background: #FAF8F5;
+            --surface: #FFFFFF;
+            --border: #E8DDD7;
+            --text-primary: #2C1810;
+            --text-secondary: #6B5D54;
+            --text-muted: #9B8E84;
+            --success: #7FA663;
+        }
+
         body {
-            font-family: 'Noto Nastaliq Urdu', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--background);
+            color: var(--text-primary);
+            line-height: 1.6;
+            direction: rtl;
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
             align-items: center;
+            justify-content: center;
             padding: 20px;
-            direction: rtl;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        .header {
-            background: white;
-            padding: 20px 40px;
-            border-radius: 15px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-            text-align: center;
-            max-width: 800px;
+        .container {
             width: 100%;
+            max-width: 440px;
+            animation: fadeInUp 0.6s ease;
         }
 
-        .header h1 {
-            color: #2d3748;
-            font-size: 2.5rem;
-            margin-bottom: 10px;
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .main-container {
-            background: white;
+        .flag-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 24px;
+            display: block;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(212, 114, 78, 0.15);
+        }
+
+        h1 {
+            font-size: 28px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 400;
+            margin-bottom: 48px;
+        }
+
+        .card {
+            background: var(--surface);
             border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             padding: 40px;
-            max-width: 600px;
-            width: 100%;
+            box-shadow: 
+                0 1px 2px rgba(0, 0, 0, 0.04),
+                0 4px 8px rgba(0, 0, 0, 0.04),
+                0 12px 24px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border);
         }
 
-        .button-container {
-            text-align: center;
-            margin: 30px 0;
-        }
-
-        .voice-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .mic-button {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent);
             border: none;
-            padding: 20px 50px;
-            border-radius: 50px;
-            font-size: 1.5rem;
+            border-radius: 60px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-        }
-
-        .voice-button:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
-        }
-
-        .voice-button:active {
-            transform: translateY(-1px);
-        }
-
-        .icon {
-            display: inline-block;
-            margin-left: 10px;
-            font-size: 1.8rem;
-        }
-
-        .instructions {
-            background: #f7fafc;
-            padding: 25px;
-            border-radius: 10px;
-            margin-top: 30px;
-        }
-
-        .instructions h3 {
-            color: #2d3748;
-            margin-bottom: 15px;
-            font-size: 1.3rem;
-        }
-
-        .instructions ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        .instructions li {
-            padding: 10px 0;
-            color: #4a5568;
-            font-size: 1.1rem;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
-            padding-right: 30px;
+            overflow: hidden;
         }
 
-        .instructions li::before {
-            content: "✓";
+        .mic-button::before {
+            content: '';
             position: absolute;
-            right: 0;
-            color: #48bb78;
-            font-weight: bold;
-            font-size: 1.2rem;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            transform: translate(-50%, -50%);
+            opacity: 0;
+            transition: opacity 0.3s ease;
         }
 
-        .note {
-            background: #fef5e7;
-            border-right: 4px solid #f39c12;
-            padding: 15px;
-            margin: 20px 0;
-            border-radius: 8px;
+        .mic-button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 8px 32px rgba(212, 114, 78, 0.3);
         }
 
-        .note strong {
-            color: #d68910;
+        .mic-button:hover::before {
+            opacity: 1;
         }
 
-        .info-box {
-            background: #e8f5e9;
-            border-right: 4px solid #4caf50;
-            padding: 20px;
-            margin: 20px 0;
-            border-radius: 8px;
+        .mic-button:active {
+            transform: scale(0.98);
         }
 
-        .info-box h4 {
-            color: #2e7d32;
-            margin-bottom: 10px;
+        .mic-icon {
+            width: 40px;
+            height: 40px;
+            fill: white;
         }
 
-        .info-box p {
-            color: #424242;
-            line-height: 1.6;
+        .action-text {
+            text-align: center;
+            font-size: 16px;
+            color: var(--text-primary);
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .helper-text {
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 40px;
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--border);
+            margin: 32px 0;
+        }
+
+        .steps {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .step-number {
+            width: 24px;
+            height: 24px;
+            background: var(--background);
+            border: 1.5px solid var(--border);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            flex-shrink: 0;
+        }
+
+        .step-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            padding-top: 2px;
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                box-shadow: 0 0 0 0 rgba(212, 114, 78, 0.4);
+            }
+            50% {
+                box-shadow: 0 0 0 20px rgba(212, 114, 78, 0);
+            }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 48px;
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .language-tag {
+            display: inline-flex;
+            gap: 8px;
+            padding: 4px 12px;
+            background: var(--background);
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 16px;
+        }
+
+        .dot {
+            width: 4px;
+            height: 4px;
+            background: var(--text-muted);
+            border-radius: 2px;
+            align-self: center;
+        }
+
+        /* Loading state */
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 480px) {
+            .card {
+                padding: 32px 24px;
+            }
+            
+            h1 {
+                font-size: 24px;
+            }
+            
+            .mic-button {
+                width: 100px;
+                height: 100px;
+            }
+        }
+
+        /* Light/Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --primary: #FFFFFF;
+                --secondary: #A0A0A0;
+                --background: #000000;
+                --surface: #1A1A1A;
+                --border: #2A2A2A;
+                --text-primary: #FFFFFF;
+                --text-secondary: #A0A0A0;
+                --text-muted: #666666;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>🇵🇰 پاکستان حکومت شکایات سسٹم</h1>
-        <p style="color: #718096; font-size: 1.2rem;">اپنی شکایت اردو، پنجابی یا سرائیکی میں درج کروائیں</p>
-    </div>
+    <div class="container">
+        <!-- Pakistan Flag Icon -->
+        <svg class="flag-icon" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="12" fill="#01411C"/>
+            <rect x="12" width="36" height="48" fill="white"/>
+            <circle cx="28" cy="24" r="7" fill="white"/>
+            <circle cx="30" cy="24" r="5.6" fill="#01411C"/>
+            <path d="M32 21 L34 23 L32 25 L30 23 Z" fill="white" transform="rotate(20 32 23)"/>
+        </svg>
 
-    <div class="main-container">
-        <div class="button-container">
-            <button class="voice-button" onclick="openAssistant()">
-                <span class="icon">🎤</span>
-                Voice Assistant شروع کریں
+        <h1>شکایات رجسٹریشن</h1>
+        <p class="subtitle">پاکستان حکومت کمپلینٹ سسٹم</p>
+
+        <div class="card">
+            <div class="action-text">Voice Assistant</div>
+            <div class="helper-text">اپنی شکایت درج کروانے کے لیے دبائیں</div>
+            
+            <button class="mic-button pulse" onclick="openAssistant()" aria-label="Start Voice Assistant">
+                <svg class="mic-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
             </button>
+
+            <div class="divider"></div>
+
+            <div class="steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <div class="step-text">مائیک کی اجازت دیں</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <div class="step-text">اپنی شکایت بیان کریں</div>
+                </div>
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <div class="step-text">ٹکٹ نمبر محفوظ کریں</div>
+                </div>
+            </div>
+
+            <center>
+                <div class="language-tag">
+                    <span>اردو</span>
+                    <span class="dot"></span>
+                    <span>پنجابی</span>
+                    <span class="dot"></span>
+                    <span>سرائیکی</span>
+                </div>
+            </center>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p style="margin-top: 8px; font-size: 14px; color: var(--text-secondary);">Loading assistant...</p>
+            </div>
         </div>
 
-        <div class="note">
-            <strong>نوٹ:</strong> بٹن دبانے پر ایک نئی ٹیب کھلے گی جہاں آپ اپنی شکایت درج کر سکیں گے۔
-        </div>
-
-        <div class="info-box">
-            <h4>کیسے استعمال کریں؟</h4>
-            <p>
-                1. اوپر دیے گئے بٹن پر کلک کریں<br>
-                2. نئی ٹیب میں مائیک کی اجازت دیں<br>
-                3. اپنی شکایت اردو میں بیان کریں<br>
-                4. ٹکٹ نمبر محفوظ کر لیں
-            </p>
-        </div>
-
-        <div class="instructions">
-            <h3>شکایت درج کرتے وقت یاد رکھیں:</h3>
-            <ul>
-                <li>اپنا مکمل نام بتائیں</li>
-                <li>اپنا علاقہ اور شہر واضح طور پر بتائیں</li>
-                <li>مسئلہ کی تفصیلات فراہم کریں</li>
-                <li>کب سے مسئلہ ہے، یہ بتائیں</li>
-                <li>ٹکٹ نمبر ضرور نوٹ کر لیں</li>
-            </ul>
+        <div class="footer">
+            Government of Pakistan • حکومت پاکستان
         </div>
     </div>
 
     <script>
         function openAssistant() {
-            // Open Uplift assistant in new tab
-            const assistantUrl = 'https://platform.upliftai.org/assistant/db05d122-2c23-4869-a730-6679521014f3?name=Pakistan%20Complaint%20Agent%20';
-            window.open(assistantUrl, '_blank');
+            const button = document.querySelector('.mic-button');
+            const loading = document.getElementById('loading');
             
-            // Show alert with instructions
+            // Visual feedback
+            button.classList.remove('pulse');
+            loading.style.display = 'block';
+            
+            // Open assistant
+            const assistantUrl = 'https://platform.upliftai.org/assistant/db05d122-2c23-4869-a730-6679521014f3?name=Pakistan%20Complaint%20Agent%20';
+            const assistantWindow = window.open(assistantUrl, '_blank');
+            
+            // Reset after 2 seconds
             setTimeout(() => {
-                alert('نئی ٹیب میں Voice Assistant کھل گیا ہے۔ وہاں جا کر اپنی شکایت درج کریں۔');
-            }, 1000);
+                loading.style.display = 'none';
+                button.classList.add('pulse');
+                
+                if (assistantWindow) {
+                    // Show subtle notification instead of alert
+                    showNotification();
+                }
+            }, 2000);
         }
 
-        // Fetch config from server
-        fetch('/api/config')
-            .then(response => response.json())
-            .then(data => {
-                console.log('Assistant Configuration:', data);
-            })
-            .catch(error => console.error('Error:', error));
+        function showNotification() {
+            // Create a subtle notification (you could enhance this)
+            console.log('Voice Assistant opened in new tab');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            // Add subtle entrance animation
+            document.querySelector('.container').style.opacity = '1';
+        });
+
+        // Keyboard accessibility
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.classList.contains('mic-button')) {
+                openAssistant();
+            }
+        });
     </script>
 </body>
 </html>
