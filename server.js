@@ -1,4 +1,18 @@
-const express = require('express');
+// Google Cloud Text-to-Speech with Gemini-TTS
+async function googleTextToSpeech(text) {
+    try {
+        console.log(`Calling Google Gemini-TTS (${ttsConfig.googleVoice}) with:`, text.substring(0, 50) + '...');
+        
+        // Try with camelCase for Node.js SDK
+        const request = {
+            input: { 
+                text: text,
+                prompt: "You are having a friendly conversation. Speak naturally and conversationally."
+            },
+            voice: {
+                languageCode: 'en-US',
+                name: ttsConfig.googleVoice,
+                modelName: ttsConfig.googleModel  // Try caconst express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
@@ -349,22 +363,36 @@ async function googleTextToSpeech(text) {
     try {
         console.log(`Calling Google Gemini-TTS (${ttsConfig.googleVoice}) with:`, text.substring(0, 50) + '...');
         
+        // Log the exact configuration being used
+        console.log('Google TTS Config:', {
+            voice: ttsConfig.googleVoice,
+            model: ttsConfig.googleModel
+        });
+        
         const request = {
             input: { 
                 text: text,
                 prompt: "You are having a friendly conversation. Speak naturally and conversationally."
             },
             voice: {
-                language_code: 'en-US',  // Using snake_case as shown in docs
+                languageCode: 'en-US',
                 name: ttsConfig.googleVoice,
-                model_name: ttsConfig.googleModel  // Using snake_case as shown in docs
+                model_name: ttsConfig.googleModel
             },
-            audio_config: {
-                audio_encoding: 'MP3'  // This might need to be an enum value
+            audioConfig: {
+                audioEncoding: 'MP3'
             }
         };
         
+        console.log('Sending request to Google TTS...');
         const [response] = await googleTTSClient.synthesizeSpeech(request);
+        console.log('Got response from Google TTS');
+        
+        if (!response || !response.audioContent) {
+            console.error('No audio content in response');
+            return null;
+        }
+        
         const audioBuffer = Buffer.from(response.audioContent, 'base64');
         
         console.log('Gemini-TTS audio received (MP3), size:', audioBuffer.length);
@@ -372,8 +400,9 @@ async function googleTextToSpeech(text) {
         return audioBuffer;
         
     } catch (error) {
-        console.error('Google TTS error:', error);
-        console.error('Request was:', JSON.stringify(request, null, 2));
+        console.error('Google TTS error:', error.message);
+        console.error('Error code:', error.code);
+        console.error('Error details:', error.details);
         return null;
     }
 }
