@@ -82,7 +82,8 @@ wss.on('connection', (ws) => {
                 case 'audio':
                     if (data.data) {
                         // Check if user is interrupting while assistant is speaking
-                        if (isSpeaking && data.data.some(sample => Math.abs(sample) > 1000)) {
+                        // Lowered threshold for more sensitive interruption detection
+                        if (isSpeaking && data.data.some(sample => Math.abs(sample) > 500)) {
                             console.log('User interruption detected');
                             
                             // Stop TTS
@@ -142,6 +143,12 @@ wss.on('connection', (ws) => {
     ws.on('error', (error) => {
         console.error('WebSocket error:', error);
     });
+    
+    // Add function reference to WebSocket object for access in processAudioChunk
+    ws.isSpeaking = () => isSpeaking;
+    ws.setIsSpeaking = (value) => { isSpeaking = value; };
+    ws.isActive = () => isActive;
+    ws.setIsActive = (value) => { isActive = value; };
 });
 
 // Convert Int16Array to WAV format
@@ -377,8 +384,8 @@ async function processAudioChunk(ws, audioData) {
             }));
             
             // Stop capturing audio while speaking
-            isSpeaking = true;
-            isActive = false;
+            ws.setIsSpeaking(true);
+            ws.setIsActive(false);
             
             // Generate TTS audio
             const audioBuffer = await textToSpeech(llmResponse);
@@ -398,8 +405,8 @@ async function processAudioChunk(ws, audioData) {
                 type: 'state',
                 state: 'listening'
             }));
-            isSpeaking = false;
-            isActive = true;
+            ws.setIsSpeaking(false);
+            ws.setIsActive(true);
         }
         
     } catch (error) {
