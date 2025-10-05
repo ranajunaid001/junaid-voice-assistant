@@ -9,6 +9,9 @@ require('dotenv').config();
 // Import AWS SDK at the top
 const { PollyClient, SynthesizeSpeechCommand } = require('@aws-sdk/client-polly');
 
+// Import Google Cloud Text-to-Speech
+const textToSpeech = require('@google-cloud/text-to-speech');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -25,6 +28,14 @@ const pollyClient = new PollyClient({
         secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
     }
 });
+
+// Configure Google TTS
+const googleTTSClient = new textToSpeech.TextToSpeechClient({
+    credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS)
+});
+
+// TTS service selection (can be 'aws' or 'google')
+let ttsService = 'aws'; // Default to AWS
 
 // Serve static files
 app.use(express.static('public'));
@@ -77,6 +88,18 @@ wss.on('connection', (ws) => {
                         type: 'state',
                         state: 'idle'
                     }));
+                    break;
+                    
+                case 'setTTS':
+                    // Handle TTS service change
+                    if (data.service === 'aws' || data.service === 'google') {
+                        ttsService = data.service;
+                        console.log('TTS service changed to:', ttsService);
+                        ws.send(JSON.stringify({
+                            type: 'ttsChanged',
+                            service: ttsService
+                        }));
+                    }
                     break;
                     
                 case 'audio':
@@ -227,17 +250,26 @@ async function transcribeAudio(audioBuffer) {
     }
 }
 
-// Replace the textToSpeech function with Amazon Polly
-async function textToSpeech(text) {
+// Text-to-Speech router function
+async function textToSpeechRouter(text) {
+    if (ttsService === 'google') {
+        return await googleTextToSpeech(text);
+    } else {
+        return await awsTextToSpeech(text);
+    }
+}
+
+// AWS Polly Text-to-Speech
+async function awsTextToSpeech(text) {
     try {
         console.log('Calling Amazon Polly TTS with:', text.substring(0, 50) + '...');
         
         const params = {
             Text: text,
-            OutputFormat: 'pcm',
-            VoiceId: 'Matthew', // Male US voice similar to Chip
-            SampleRate: '16000',
-            Engine: 'neural' // Better quality voice
+            OutputFormat: 'mp3',
+            VoiceId: 'Stephen', // or 'Ruth' - these support Generative
+            SampleRate: '24000', // Generative default
+            Engine: 'generative' // Most expressive voice
         };
         
         const command = new SynthesizeSpeechCommand(params);
@@ -250,14 +282,43 @@ async function textToSpeech(text) {
         }
         const audioBuffer = Buffer.concat(chunks);
         
-        // Convert PCM to WAV
-        const wavBuffer = createWavFromPCM(audioBuffer, 16000);
+        console.log('Polly TTS audio received (MP3), size:', audioBuffer.length);
         
-        console.log('Polly TTS audio received, size:', wavBuffer.length);
-        return wavBuffer;
+        // Return MP3 directly - browser can play it
+        return audioBuffer;
         
     } catch (error) {
-        console.error('TTS error:', error);
+        console.error('AWS TTS error:', error);
+        return null;
+    }
+}
+
+// Google Cloud Text-to-Speech
+async function googleTextToSpeech(text) {
+    try {
+        console.log('Calling Google TTS with:', text.substring(0, 50) + '...');
+        
+        const request = {
+            input: { text: text },
+            voice: {
+                languageCode: 'en-US',
+                name: 'en-US-Journey-D', // Male voice similar to Stephen
+                ssmlGender: 'MALE'
+            },
+            audioConfig: {
+                audioEncoding: 'MP3'
+            }
+        };
+        
+        const [response] = await googleTTSClient.synthesizeSpeech(request);
+        const audioBuffer = Buffer.from(response.audioContent, 'base64');
+        
+        console.log('Google TTS audio received (MP3), size:', audioBuffer.length);
+        
+        return audioBuffer;
+        
+    } catch (error) {
+        console.error('Google TTS error:', error);
         return null;
     }
 }
@@ -387,8 +448,8 @@ async function processAudioChunk(ws, audioData) {
             ws.setIsSpeaking(true);
             ws.setIsActive(false);
             
-            // Generate TTS audio
-            const audioBuffer = await textToSpeech(llmResponse);
+            // Generate TTS audio using selected service
+            const audioBuffer = await textToSpeechRouter(llmResponse);
             
             if (audioBuffer) {
                 // Send audio as base64
@@ -396,7 +457,7 @@ async function processAudioChunk(ws, audioData) {
                 ws.send(JSON.stringify({
                     type: 'audio',
                     data: audioBase64,
-                    format: 'mp3'  // Changed from 'wav' to 'mp3'
+                    format: 'mp3'  // Both services output MP3
                 }));
             }
             
