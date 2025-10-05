@@ -12,6 +12,10 @@ const { PollyClient, SynthesizeSpeechCommand } = require('@aws-sdk/client-polly'
 // Import Google Cloud Text-to-Speech
 const textToSpeech = require('@google-cloud/text-to-speech');
 
+// Import Pinecone and OpenAI for RAG
+const { Pinecone } = require('@pinecone-database/pinecone');
+const OpenAI = require('openai');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -33,6 +37,11 @@ const pollyClient = new PollyClient({
 const googleTTSClient = new textToSpeech.TextToSpeechClient({
     credentials: JSON.parse(process.env.GOOGLE_CREDENTIALS)
 });
+
+// Configure OpenAI and Pinecone for RAG
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const pinecone = new Pinecone({ apiKey: process.env.PINECONE_API_KEY });
+const index = pinecone.index('junaid-assistant', process.env.PINECONE_HOST);
 
 // TTS configuration - stores current settings
 let ttsConfig = {
@@ -422,10 +431,53 @@ function createWavFromPCM(pcmBuffer, sampleRate = 16000) {
     return wavBuffer;
 }
 
+// Search knowledge base function for RAG
+async function searchKnowledge(query) {
+    try {
+        const embedding = await openai.embeddings.create({
+            model: "text-embedding-3-small",
+            input: query,
+        });
+        
+        const results = await index.query({
+            vector: embedding.data[0].embedding,
+            topK: 3,
+            includeMetadata: true
+        });
+        
+        const context = results.matches
+            .map(match => match.metadata.text)
+            .join('\n\n');
+        
+        return context;
+    } catch (error) {
+        console.error('Search error:', error);
+        return '';
+    }
+}
+
 // Call Groq LLM for response
 async function getLLMResponse(transcript) {
     try {
         console.log('Calling Groq LLM with:', transcript);
+        
+        // Search for relevant context
+        const context = await searchKnowledge(transcript);
+        console.log('Found context:', context ? 'Yes' : 'No');
+        
+        // Build messages with context
+        const messages = [
+            {
+                role: 'system',
+                content: `You are Junaid speaking in first person. You have knowledge about your work on AI contact center solutions, voice assistants, and other projects. Use the provided context to answer questions accurately. Keep responses concise and natural for speech. If asked about something not in your knowledge, politely say you haven't worked on that specific area.
+
+Context: ${context}`
+            },
+            {
+                role: 'user',
+                content: transcript
+            }
+        ];
         
         const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
             method: 'POST',
@@ -435,16 +487,7 @@ async function getLLMResponse(transcript) {
             },
             body: JSON.stringify({
                 model: 'llama-3.3-70b-versatile',
-                messages: [
-                    {
-                        role: 'system',
-                        content: 'You are a helpful voice assistant. Keep responses concise and natural for speech.'
-                    },
-                    {
-                        role: 'user',
-                        content: transcript
-                    }
-                ],
+                messages: messages,
                 temperature: 0.7,
                 max_tokens: 150
             })
