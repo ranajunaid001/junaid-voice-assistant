@@ -235,9 +235,9 @@ async function textToSpeech(text) {
         const params = {
             Text: text,
             OutputFormat: 'pcm',
-            VoiceId: 'Matthew', // Male US voice similar to Chip
-            SampleRate: '16000',
-            Engine: 'neural' // Better quality voice
+            VoiceId: 'Stephen', // or 'Ruth' - these support Generative
+            SampleRate: '24000',
+            Engine: 'generative' // Better quality voice
         };
         
         const command = new SynthesizeSpeechCommand(params);
