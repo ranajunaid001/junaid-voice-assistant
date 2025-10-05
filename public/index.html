@@ -1,1 +1,211 @@
 
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>پاکستان شکایات رجسٹریشن سسٹم</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Nastaliq Urdu', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            direction: rtl;
+        }
+
+        .header {
+            background: white;
+            padding: 20px 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+            text-align: center;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+
+        .main-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        .button-container {
+            text-align: center;
+            margin: 30px 0;
+        }
+
+        .voice-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 20px 50px;
+            border-radius: 50px;
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .voice-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+        }
+
+        .voice-button:active {
+            transform: translateY(-1px);
+        }
+
+        .icon {
+            display: inline-block;
+            margin-left: 10px;
+            font-size: 1.8rem;
+        }
+
+        .instructions {
+            background: #f7fafc;
+            padding: 25px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
+        .instructions h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .instructions ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instructions li {
+            padding: 10px 0;
+            color: #4a5568;
+            font-size: 1.1rem;
+            position: relative;
+            padding-right: 30px;
+        }
+
+        .instructions li::before {
+            content: "✓";
+            position: absolute;
+            right: 0;
+            color: #48bb78;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .note {
+            background: #fef5e7;
+            border-right: 4px solid #f39c12;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .note strong {
+            color: #d68910;
+        }
+
+        .info-box {
+            background: #e8f5e9;
+            border-right: 4px solid #4caf50;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+        }
+
+        .info-box h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .info-box p {
+            color: #424242;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🇵🇰 پاکستان حکومت شکایات سسٹم</h1>
+        <p style="color: #718096; font-size: 1.2rem;">اپنی شکایت اردو، پنجابی یا سرائیکی میں درج کروائیں</p>
+    </div>
+
+    <div class="main-container">
+        <div class="button-container">
+            <button class="voice-button" onclick="openAssistant()">
+                <span class="icon">🎤</span>
+                Voice Assistant شروع کریں
+            </button>
+        </div>
+
+        <div class="note">
+            <strong>نوٹ:</strong> بٹن دبانے پر ایک نئی ٹیب کھلے گی جہاں آپ اپنی شکایت درج کر سکیں گے۔
+        </div>
+
+        <div class="info-box">
+            <h4>کیسے استعمال کریں؟</h4>
+            <p>
+                1. اوپر دیے گئے بٹن پر کلک کریں<br>
+                2. نئی ٹیب میں مائیک کی اجازت دیں<br>
+                3. اپنی شکایت اردو میں بیان کریں<br>
+                4. ٹکٹ نمبر محفوظ کر لیں
+            </p>
+        </div>
+
+        <div class="instructions">
+            <h3>شکایت درج کرتے وقت یاد رکھیں:</h3>
+            <ul>
+                <li>اپنا مکمل نام بتائیں</li>
+                <li>اپنا علاقہ اور شہر واضح طور پر بتائیں</li>
+                <li>مسئلہ کی تفصیلات فراہم کریں</li>
+                <li>کب سے مسئلہ ہے، یہ بتائیں</li>
+                <li>ٹکٹ نمبر ضرور نوٹ کر لیں</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function openAssistant() {
+            // Open Uplift assistant in new tab
+            const assistantUrl = 'https://platform.upliftai.org/assistant/db05d122-2c23-4869-a730-6679521014f3?name=Pakistan%20Complaint%20Agent%20';
+            window.open(assistantUrl, '_blank');
+            
+            // Show alert with instructions
+            setTimeout(() => {
+                alert('نئی ٹیب میں Voice Assistant کھل گیا ہے۔ وہاں جا کر اپنی شکایت درج کریں۔');
+            }, 1000);
+        }
+
+        // Fetch config from server
+        fetch('/api/config')
+            .then(response => response.json())
+            .then(data => {
+                console.log('Assistant Configuration:', data);
+            })
+            .catch(error => console.error('Error:', error));
+    </script>
+</body>
+</html>
