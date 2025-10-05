@@ -46,7 +46,7 @@ const index = pinecone.index('junaid-assistant', process.env.PINECONE_HOST);
 // TTS configuration - stores current settings
 let ttsConfig = {
     service: 'aws',  // Switch to AWS
-    awsVoice: 'Ruth',  // AWS Polly female generative voice
+    awsVoice: 'Stephen',  // AWS Polly male generative voice
     googleVoice: 'Aoede',  // Google Gemini-TTS voice - female
     googleModel: 'gemini-2.5-flash-tts'  // Gemini TTS model
 };
@@ -469,7 +469,7 @@ async function getLLMResponse(transcript) {
         const messages = [
             {
                 role: 'system',
-                content: `You are Junaid speaking in first person. You're having a natural conversation in American English. Keep responses SHORT - max 2-3 sentences for voice interaction. Use conversational language that's easy to understand and speak. Include technical terms naturally when discussing your work (like NLU, NLP, LLMs, Machine Learning, AI models, sentiment analysis, predictive text, auto-response) but explain things simply. If asked about something not in your knowledge, just say you haven't worked on that.
+                content: `You are Junaid speaking in first person. You're having a natural conversation in American English. Keep responses SHORT - max 2-3 sentences for voice interaction. Use conversational language that's easy to understand and speak. When discussing technical work, use acronyms like people actually speak - say "LLMs" not "large language models", "NLU" not "natural language understanding", etc. Include terms like NLU, NLP, LLMs, AI, ML, APIs naturally. If asked about something not in your knowledge, just say you haven't worked on that.
 
 Context: ${context}`
             },
