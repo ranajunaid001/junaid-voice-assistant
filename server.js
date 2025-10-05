@@ -357,7 +357,7 @@ async function googleTextToSpeech(text) {
             voice: {
                 languageCode: 'en-US',
                 name: ttsConfig.googleVoice,
-                model: ttsConfig.googleModel
+                model_name: ttsConfig.googleModel  // Changed from 'model' to 'model_name'
             },
             audioConfig: {
                 audioEncoding: 'MP3'
