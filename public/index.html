@@ -356,37 +356,58 @@
         // Initialize audio context and microphone
         async function initAudio() {
             try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                    audio: {
+                        sampleRate: 16000,
+                        channelCount: 1,
+                        echoCancellation: true,
+                        noiseSuppression: true
+                    } 
+                });
                 
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 processor = audioContext.createScriptProcessor(2048, 1, 1);
                 
+                let messageCount = 0;
+                
                 processor.onaudioprocess = (e) => {
-                    if (!isActive || !isConnected) return;
+                    if (!isActive || !isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
                     
                     const inputData = e.inputBuffer.getChannelData(0);
                     const outputData = new Int16Array(inputData.length);
                     
                     // Convert float32 to int16
                     for (let i = 0; i < inputData.length; i++) {
-                        outputData[i] = Math.max(-32768, Math.min(32767, inputData[i] * 32768));
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                     }
                     
                     // Send audio data via WebSocket
-                    ws.send(JSON.stringify({
-                        type: 'audio',
-                        data: Array.from(outputData)
-                    }));
+                    try {
+                        ws.send(JSON.stringify({
+                            type: 'audio',
+                            data: Array.from(outputData)
+                        }));
+                        
+                        // Debug log every 50th message
+                        messageCount++;
+                        if (messageCount % 50 === 0) {
+                            console.log(`Sent ${messageCount} audio chunks`);
+                        }
+                    } catch (error) {
+                        console.error('Error sending audio:', error);
+                    }
                     
                     // Update visualizer
                     updateVisualizer(inputData);
                 };
                 
                 source.connect(processor);
-                processor.connect(audioContext.destination);
+                // Don't connect to destination to avoid echo
                 
                 instruction.textContent = 'Click to start conversation';
+                console.log('Audio initialized successfully');
                 
             } catch (error) {
                 console.error('Error initializing audio:', error);
@@ -415,14 +436,24 @@
 
         // Toggle conversation
         function toggleConversation() {
-            if (!isConnected || !audioContext) return;
+            if (!isConnected || !audioContext) {
+                console.error('Not ready:', { isConnected, hasAudioContext: !!audioContext });
+                return;
+            }
             
             isActive = !isActive;
             
             if (isActive) {
+                console.log('Starting conversation');
                 ws.send(JSON.stringify({ type: 'start' }));
                 instruction.textContent = 'Click to stop';
+                
+                // Resume audio context if suspended
+                if (audioContext.state === 'suspended') {
+                    audioContext.resume();
+                }
             } else {
+                console.log('Stopping conversation');
                 ws.send(JSON.stringify({ type: 'stop' }));
                 instruction.textContent = 'Click to start conversation';
             }
