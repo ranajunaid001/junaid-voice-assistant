@@ -315,6 +315,9 @@ async function processAudioChunk(ws, audioData) {
                 type: 'state',
                 state: 'speaking'
             }));
+
+            // Stop capturing audio while speaking
+            isActive = false;  // ADD THIS LINE
             
             // Generate TTS audio
             const audioBuffer = await textToSpeech(llmResponse);
@@ -334,6 +337,7 @@ async function processAudioChunk(ws, audioData) {
                 type: 'state',
                 state: 'listening'
             }));
+            isActive = true;  // ADD THIS LINE
         }
         
     } catch (error) {
