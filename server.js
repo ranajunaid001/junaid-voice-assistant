@@ -30,6 +30,7 @@ wss.on('connection', (ws) => {
     let isActive = false;
     let audioBuffer = [];
     let transcriptionTimeout = null;
+    let isSpeaking = false;
     
     // Send initial state
     ws.send(JSON.stringify({
@@ -67,27 +68,50 @@ wss.on('connection', (ws) => {
                     break;
                     
                 case 'audio':
-                    if (isActive && data.data) {
-                        // Debug: Log that audio is received
-                        console.log(`Received audio data: ${data.data.length} samples`);
-                        
-                        // Add audio data to buffer
-                        audioBuffer.push(...data.data);
-                        
-                        // Only process if buffer is getting too large (safety limit)
-                        if (audioBuffer.length >= 160000) { // ~10 seconds at 16kHz
-                            processAudioChunk(ws, audioBuffer.splice(0, 160000));
+                    if (data.data) {
+                        // Check if user is interrupting while assistant is speaking
+                        if (isSpeaking && data.data.some(sample => Math.abs(sample) > 1000)) {
+                            console.log('User interruption detected');
+                            
+                            // Stop TTS
+                            ws.send(JSON.stringify({
+                                type: 'command',
+                                action: 'stopAudio'
+                            }));
+                            
+                            // Reset state
+                            isSpeaking = false;
+                            isActive = true;
+                            audioBuffer = [];
+                            
+                            ws.send(JSON.stringify({
+                                type: 'state',
+                                state: 'listening'
+                            }));
                         }
                         
-                        // Set timeout to process remaining audio
-                        if (transcriptionTimeout) {
-                            clearTimeout(transcriptionTimeout);
-                        }
-                        transcriptionTimeout = setTimeout(() => {
-                            if (audioBuffer.length > 0) {
-                                processAudioChunk(ws, audioBuffer.splice(0));
+                        if (isActive) {
+                            // Debug: Log that audio is received
+                            console.log(`Received audio data: ${data.data.length} samples`);
+                            
+                            // Add audio data to buffer
+                            audioBuffer.push(...data.data);
+                            
+                            // Only process if buffer is getting too large (safety limit)
+                            if (audioBuffer.length >= 160000) { // ~10 seconds at 16kHz
+                                processAudioChunk(ws, audioBuffer.splice(0, 160000));
                             }
-                        }, 2000); // Wait 2 seconds of silence
+                            
+                            // Set timeout to process remaining audio
+                            if (transcriptionTimeout) {
+                                clearTimeout(transcriptionTimeout);
+                            }
+                            transcriptionTimeout = setTimeout(() => {
+                                if (audioBuffer.length > 0) {
+                                    processAudioChunk(ws, audioBuffer.splice(0));
+                                }
+                            }, 2000); // Wait 2 seconds of silence
+                        }
                     }
                     break;
                     
@@ -317,6 +341,7 @@ async function processAudioChunk(ws, audioData) {
             }));
             
             // Stop capturing audio while speaking
+            isSpeaking = true;
             isActive = false;
             
             // Generate TTS audio
@@ -337,6 +362,7 @@ async function processAudioChunk(ws, audioData) {
                 type: 'state',
                 state: 'listening'
             }));
+            isSpeaking = false;
             isActive = true;
         }
         
