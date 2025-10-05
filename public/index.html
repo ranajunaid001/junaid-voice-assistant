@@ -527,12 +527,27 @@
                     if (!isActive || !isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
                     
                     const inputData = e.inputBuffer.getChannelData(0);
-                    const outputData = new Int16Array(inputData.length);
                     
-                    // Convert float32 to int16
-                    for (let i = 0; i < inputData.length; i++) {
-                        const s = Math.max(-1, Math.min(1, inputData[i]));
-                        outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                    // Resample if needed (mobile uses 48kHz, server expects 16kHz)
+                    let outputData;
+                    if (audioContext.sampleRate === 48000) {
+                        // Downsample from 48kHz to 16kHz (take every 3rd sample)
+                        const downsampled = new Float32Array(Math.floor(inputData.length / 3));
+                        for (let i = 0; i < downsampled.length; i++) {
+                            downsampled[i] = inputData[i * 3];
+                        }
+                        outputData = new Int16Array(downsampled.length);
+                        for (let i = 0; i < downsampled.length; i++) {
+                            const s = Math.max(-1, Math.min(1, downsampled[i]));
+                            outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        }
+                    } else {
+                        // Original code for desktop
+                        outputData = new Int16Array(inputData.length);
+                        for (let i = 0; i < inputData.length; i++) {
+                            const s = Math.max(-1, Math.min(1, inputData[i]));
+                            outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+                        }
                     }
                     
                     // Send audio data via WebSocket
@@ -637,27 +652,50 @@
             }
         }
 
-        // Global audio element for iOS
-        let globalAudio = null;
-        let audioQueue = [];
+        // iOS Audio Handler - Best Practice Implementation
+        let iosAudioContext = null;
+        let iosAudioUnlocked = false;
         
-        // Initialize global audio on first user interaction
-        function initGlobalAudio() {
-            if (!globalAudio) {
-                globalAudio = new Audio();
-                globalAudio.setAttribute('playsinline', 'true');
-                // Play empty sound to initialize
-                globalAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA';
-                globalAudio.volume = 0.1;
-                globalAudio.play().then(() => {
-                    console.log('Global audio initialized');
-                }).catch(e => {
-                    console.log('Global audio init failed:', e);
-                });
+        // Create iOS-specific audio context
+        function createIOSAudioContext() {
+            if (iosAudioContext) return;
+            
+            try {
+                // Create a separate audio context for playback
+                iosAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('iOS Audio context created');
+            } catch (e) {
+                console.error('Failed to create iOS audio context:', e);
             }
         }
-
-        // Play audio chunk from server - UPDATED FOR iOS
+        
+        // Unlock iOS audio on user gesture
+        async function unlockIOSAudio() {
+            if (iosAudioUnlocked || !iosAudioContext) return;
+            
+            try {
+                // Create empty buffer
+                const buffer = iosAudioContext.createBuffer(1, 1, 22050);
+                const source = iosAudioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(iosAudioContext.destination);
+                
+                // Play silent buffer
+                source.start(0);
+                
+                // Resume if suspended
+                if (iosAudioContext.state === 'suspended') {
+                    await iosAudioContext.resume();
+                }
+                
+                iosAudioUnlocked = true;
+                console.log('iOS audio unlocked successfully');
+            } catch (e) {
+                console.error('iOS audio unlock failed:', e);
+            }
+        }
+        
+        // Play audio chunk from server - Best Practice for iOS
         async function playAudioChunk(audioData) {
             try {
                 console.log('playAudioChunk called');
@@ -672,47 +710,71 @@
                 const blob = new Blob([bytes], { type: 'audio/mp3' });
                 const url = URL.createObjectURL(blob);
                 
-                // Use global audio element for iOS
-                if (globalAudio) {
-                    globalAudio.src = url;
-                    globalAudio.volume = 1.0;
-                    globalAudio.play().then(() => {
-                        console.log('Audio playing via global element');
-                    }).catch(e => {
-                        console.error('Global audio play failed:', e);
-                    });
-                    
-                    globalAudio.onended = () => {
-                        URL.revokeObjectURL(url);
-                    };
-                } else {
-                    // Fallback to original method
-                    currentAudio = new Audio(url);
-                    currentAudio.setAttribute('playsinline', 'true');
-                    currentAudio.play().catch(e => {
-                        console.error('Fallback audio play failed:', e);
-                    });
-                    
-                    currentAudio.addEventListener('ended', () => {
-                        URL.revokeObjectURL(url);
-                        currentAudio = null;
-                    });
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
                 }
+                
+                // Create new audio element
+                currentAudio = new Audio();
+                currentAudio.src = url;
+                currentAudio.setAttribute('playsinline', 'true');
+                
+                // Use Web Audio API for iOS if available
+                if (iosAudioContext && iosAudioUnlocked) {
+                    const source = iosAudioContext.createMediaElementSource(currentAudio);
+                    source.connect(iosAudioContext.destination);
+                }
+                
+                // Play with promise handling
+                try {
+                    await currentAudio.play();
+                    console.log('Audio playing successfully');
+                } catch (playError) {
+                    console.error('Play error:', playError);
+                    
+                    // Retry once with user gesture context
+                    if (playError.name === 'NotAllowedError') {
+                        // Store audio for next user interaction
+                        window.pendingAudio = currentAudio;
+                        console.log('Audio queued for next user interaction');
+                    }
+                }
+                
+                // Cleanup
+                currentAudio.addEventListener('ended', () => {
+                    URL.revokeObjectURL(url);
+                    currentAudio = null;
+                });
                 
             } catch (error) {
                 console.error('Error in playAudioChunk:', error);
             }
         }
-
-        // Toggle conversation
+        
+        // Modified toggle conversation with iOS audio handling
         async function toggleConversation() {
             if (!isConnected || !audioContext) {
                 console.error('Not ready:', { isConnected, hasAudioContext: !!audioContext });
                 return;
             }
             
-            // Initialize global audio on first click (iOS fix)
-            initGlobalAudio();
+            // Create iOS audio context on first interaction
+            createIOSAudioContext();
+            
+            // Unlock iOS audio
+            await unlockIOSAudio();
+            
+            // Play any pending audio from previous attempt
+            if (window.pendingAudio) {
+                try {
+                    await window.pendingAudio.play();
+                    window.pendingAudio = null;
+                } catch (e) {
+                    console.log('Pending audio play failed:', e);
+                }
+            }
             
             isActive = !isActive;
             
@@ -721,10 +783,10 @@
                 ws.send(JSON.stringify({ type: 'start' }));
                 instruction.textContent = 'Click to stop';
                 
-                // Resume audio context if suspended
+                // Resume main audio context if suspended
                 if (audioContext.state === 'suspended') {
                     audioContext.resume().then(() => {
-                        console.log('Audio context resumed');
+                        console.log('Main audio context resumed');
                     });
                 }
             } else {
