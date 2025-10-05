@@ -36,8 +36,8 @@ const googleTTSClient = new textToSpeech.TextToSpeechClient({
 
 // TTS configuration - stores current settings
 let ttsConfig = {
-    service: 'google',  // 'aws' or 'google' - changed to google as default
-    awsVoice: 'Stephen',  // AWS Polly voice
+    service: 'aws',  // Switch to AWS
+    awsVoice: 'Ruth',  // AWS Polly female generative voice
     googleVoice: 'Aoede',  // Google Gemini-TTS voice - female
     googleModel: 'gemini-2.5-flash-tts'  // Gemini TTS model
 };
