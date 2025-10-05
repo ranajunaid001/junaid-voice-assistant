@@ -405,6 +405,7 @@
                 
                 source.connect(processor);
                 // Don't connect to destination to avoid echo
+                processor.connect(audioContext.destination);
                 
                 instruction.textContent = 'Click to start conversation';
                 console.log('Audio initialized successfully');
