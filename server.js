@@ -235,9 +235,9 @@ async function textToSpeech(text) {
         const params = {
             Text: text,
             OutputFormat: 'pcm',
-            VoiceId: 'Stephen', // or 'Ruth' - these support Generative
+            VoiceId: 'Matthew', // Male US voice similar to Chip
             SampleRate: '16000',
-            Engine: 'generative' // Better quality voice
+            Engine: 'neural' // Better quality voice
         };
         
         const command = new SynthesizeSpeechCommand(params);
@@ -396,7 +396,7 @@ async function processAudioChunk(ws, audioData) {
                 ws.send(JSON.stringify({
                     type: 'audio',
                     data: audioBase64,
-                    format: 'wav'
+                    format: 'mp3'  // Changed from 'wav' to 'mp3'
                 }));
             }
             
