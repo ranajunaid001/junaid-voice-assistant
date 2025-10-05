@@ -652,22 +652,68 @@
             }
         }
 
-        // Single audio element for iOS - initialized on user gesture
-        let iosAudio = null;
-        let audioInitialized = false;
+        // Global audio element that persists
+        let globalAudioElement = null;
         
-        // Initialize audio element on first user interaction
-        function initializeAudio() {
-            if (audioInitialized) return;
-            
+        // Play audio chunk from server - iOS Safari Compatible
+        async function playAudioChunk(audioData) {
             try {
-                // Create a single audio element that iOS will trust
-                iosAudio = new Audio();
-                iosAudio.setAttribute('playsinline', 'true');
-                iosAudio.setAttribute('preload', 'auto');
+                console.log('playAudioChunk called');
                 
-                // Play silence to establish user gesture
-                iosAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA';
+                // Convert base64 to blob
+                const binaryString = atob(audioData.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: 'audio/mp3' });
+                const url = URL.createObjectURL(blob);
+                
+                // Create audio element if it doesn't exist
+                if (!globalAudioElement) {
+                    globalAudioElement = new Audio();
+                    globalAudioElement.setAttribute('playsinline', 'true');
+                    document.body.appendChild(globalAudioElement);
+                }
+                
+                // Set source and play
+                globalAudioElement.src = url;
+                
+                // For iOS, we need to play in response to the NEXT user interaction
+                // Store the play action
+                const playAction = () => {
+                    globalAudioElement.play()
+                        .then(() => {
+                            console.log('Audio playing');
+                            // Remove the listener after playing
+                            document.removeEventListener('click', playAction);
+                            document.removeEventListener('touchstart', playAction);
+                        })
+                        .catch(e => console.error('Play failed:', e));
+                };
+                
+                // Try to play immediately
+                globalAudioElement.play()
+                    .then(() => {
+                        console.log('Audio playing immediately');
+                    })
+                    .catch(e => {
+                        console.log('Immediate play failed, waiting for user interaction');
+                        // If immediate play fails, wait for any user interaction
+                        document.addEventListener('click', playAction, { once: true });
+                        document.addEventListener('touchstart', playAction, { once: true });
+                    });
+                
+                // Cleanup
+                globalAudioElement.addEventListener('ended', () => {
+                    URL.revokeObjectURL(url);
+                }, { once: true });
+                
+            } catch (error) {
+                console.error('Error in playAudioChunk:', error);
+            }
+        }AAAAAAAAAAAAAAA';
                 iosAudio.volume = 0.01;
                 iosAudio.play().then(() => {
                     audioInitialized = true;
