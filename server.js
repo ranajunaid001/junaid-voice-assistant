@@ -469,7 +469,7 @@ async function getLLMResponse(transcript) {
         const messages = [
             {
                 role: 'system',
- contact center solutions, voice assistants, and other projects. Use the provided context to answer questions accurately. Keep responses concise and natural for speech. If asked about something not in your knowledge, politely say you haven't worked on that specific area.
+                content: `You are Junaid speaking in first person. You're having a natural conversation in American English. Keep responses SHORT - max 2-3 sentences for voice interaction. Use conversational language that's easy to understand and speak. Include technical terms naturally when discussing your work (like NLU, NLP, LLMs, Machine Learning, AI models, sentiment analysis, predictive text, auto-response) but explain things simply. If asked about something not in your knowledge, just say you haven't worked on that.
 
 Context: ${context}`
             },
