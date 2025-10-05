@@ -224,6 +224,7 @@
         let processor = null;
         let isConnected = false;
         let isActive = false;
+        let currentAudio = null;
 
         const orb = document.getElementById('orb');
         const status = document.getElementById('status');
@@ -304,13 +305,11 @@
                     
                 case 'command':
                     if (data.action === 'stopAudio') {
-                        // Stop all playing audio
-                        const audios = document.querySelectorAll('audio');
-                        audios.forEach(audio => {
-                            audio.pause();
-                            audio.currentTime = 0;
-                            audio.remove();
-                        });
+                        // Stop current audio
+                        if (currentAudio) {
+                            currentAudio.pause();
+                            currentAudio = null;
+                        }
                         console.log('Audio playback stopped due to interruption');
                     }
                     break;
@@ -445,6 +444,12 @@
         // Play audio chunk from server
         async function playAudioChunk(audioData) {
             try {
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
+                }
+                
                 // Convert base64 to blob
                 const binaryString = atob(audioData.data);
                 const bytes = new Uint8Array(binaryString.length);
@@ -456,17 +461,19 @@
                 const url = URL.createObjectURL(blob);
                 
                 // Create and play audio
-                const audio = new Audio(url);
-                audio.play();
+                currentAudio = new Audio(url);
+                currentAudio.play();
                 
-                // Clean up
-                audio.addEventListener('ended', () => {
+                // Clean up when audio ends
+                currentAudio.addEventListener('ended', () => {
                     URL.revokeObjectURL(url);
+                    currentAudio = null;
                 });
                 
                 console.log('Playing TTS audio');
             } catch (error) {
                 console.error('Error playing audio:', error);
+                currentAudio = null;
             }
         }
 
