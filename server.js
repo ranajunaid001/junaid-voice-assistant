@@ -32,6 +32,10 @@ wss.on('connection', (ws) => {
     let transcriptionTimeout = null;
     
     // Send initial state
+    ws.send(JSON.stringify({
+        type: 'state',
+        state: 'idle'
+    }));
     
     // Handle incoming messages
     ws.on('message', async (message) => {
@@ -46,12 +50,6 @@ wss.on('connection', (ws) => {
                     ws.send(JSON.stringify({
                         type: 'state',
                         state: 'listening'
-                    }));
-                    // Send debug message to UI
-                    ws.send(JSON.stringify({
-                        type: 'transcript',
-                        text: '[Debug] Listening started...',
-                        final: false
                     }));
                     break;
                     
@@ -72,15 +70,6 @@ wss.on('connection', (ws) => {
                     if (isActive && data.data) {
                         // Debug: Log that audio is received
                         console.log(`Received audio data: ${data.data.length} samples`);
-                        
-                        // Send debug to UI every 10th message
-                        if (Math.random() < 0.1) {
-                            ws.send(JSON.stringify({
-                                type: 'transcript',
-                                text: `[Debug] Receiving audio... buffer: ${audioBuffer.length}`,
-                                final: false
-                            }));
-                        }
                         
                         // Add audio data to buffer
                         audioBuffer.push(...data.data);
@@ -195,6 +184,49 @@ async function transcribeAudio(audioBuffer) {
     }
 }
 
+// Call Groq LLM for response
+async function getLLMResponse(transcript) {
+    try {
+        console.log('Calling Groq LLM with:', transcript);
+        
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                model: 'llama-3.1-70b-versatile',
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a helpful voice assistant. Keep responses concise and natural for speech.'
+                    },
+                    {
+                        role: 'user',
+                        content: transcript
+                    }
+                ],
+                temperature: 0.7,
+                max_tokens: 150
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            throw new Error(`LLM API error: ${response.status} - ${error}`);
+        }
+        
+        const data = await response.json();
+        console.log('LLM response:', data.choices[0].message.content);
+        return data.choices[0].message.content;
+        
+    } catch (error) {
+        console.error('LLM error:', error);
+        return "I'm sorry, I couldn't process that. Please try again.";
+    }
+}
+
 // Process audio chunk with real Whisper
 async function processAudioChunk(ws, audioData) {
     try {
@@ -223,19 +255,19 @@ async function processAudioChunk(ws, audioData) {
                 state: 'processing'
             }));
             
-            // For now, just echo back the transcript
-            // TODO: Add LLM processing here
-            setTimeout(() => {
-                ws.send(JSON.stringify({
-                    type: 'response',
-                    text: `I heard you say: "${transcript}"`
-                }));
-                
-                ws.send(JSON.stringify({
-                    type: 'state',
-                    state: 'listening'
-                }));
-            }, 500);
+            // Get LLM response
+            const llmResponse = await getLLMResponse(transcript);
+            
+            // Send LLM response
+            ws.send(JSON.stringify({
+                type: 'response',
+                text: llmResponse
+            }));
+            
+            ws.send(JSON.stringify({
+                type: 'state',
+                state: 'listening'
+            }));
         }
         
     } catch (error) {
