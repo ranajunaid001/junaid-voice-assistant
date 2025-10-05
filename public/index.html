@@ -301,6 +301,19 @@
                 case 'state':
                     updateState(data.state);
                     break;
+                    
+                case 'command':
+                    if (data.action === 'stopAudio') {
+                        // Stop all playing audio
+                        const audios = document.querySelectorAll('audio');
+                        audios.forEach(audio => {
+                            audio.pause();
+                            audio.currentTime = 0;
+                            audio.remove();
+                        });
+                        console.log('Audio playback stopped due to interruption');
+                    }
+                    break;
             }
         }
 
@@ -405,7 +418,6 @@
                 
                 source.connect(processor);
                 // Don't connect to destination to avoid echo
-                processor.connect(audioContext.destination);
                 
                 instruction.textContent = 'Click to start conversation';
                 console.log('Audio initialized successfully');
