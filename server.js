@@ -6,6 +6,9 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 require('dotenv').config();
 
+// Import AWS SDK at the top
+const { PollyClient, SynthesizeSpeechCommand } = require('@aws-sdk/client-polly');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
@@ -13,6 +16,15 @@ const wss = new WebSocket.Server({ server });
 // Groq configuration
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
+
+// Configure AWS Polly
+const pollyClient = new PollyClient({
+    region: process.env.AWS_REGION || 'us-east-1',
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+    }
+});
 
 // Serve static files
 app.use(express.static('public'));
@@ -208,40 +220,64 @@ async function transcribeAudio(audioBuffer) {
     }
 }
 
-// Call Groq TTS
+// Replace the textToSpeech function with Amazon Polly
 async function textToSpeech(text) {
     try {
-        console.log('Calling PlayAI TTS with:', text.substring(0, 50) + '...');
+        console.log('Calling Amazon Polly TTS with:', text.substring(0, 50) + '...');
         
-        const response = await fetch('https://api.groq.com/openai/v1/audio/speech', {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GROQ_API_KEY}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                model: 'playai-tts',
-                voice: 'Chip-PlayAI',
-                input: text,
-                response_format: 'wav'
-            })
-        });
+        const params = {
+            Text: text,
+            OutputFormat: 'pcm',
+            VoiceId: 'Matthew', // Male US voice similar to Chip
+            SampleRate: '16000',
+            Engine: 'neural' // Better quality voice
+        };
         
-        if (!response.ok) {
-            const error = await response.text();
-            throw new Error(`TTS API error: ${response.status} - ${error}`);
+        const command = new SynthesizeSpeechCommand(params);
+        const response = await pollyClient.send(command);
+        
+        // Convert stream to buffer
+        const chunks = [];
+        for await (const chunk of response.AudioStream) {
+            chunks.push(chunk);
         }
+        const audioBuffer = Buffer.concat(chunks);
         
-        // Get audio as buffer
-        const audioBuffer = await response.buffer();
-        console.log('TTS audio received, size:', audioBuffer.length);
+        // Convert PCM to WAV
+        const wavBuffer = createWavFromPCM(audioBuffer, 16000);
         
-        return audioBuffer;
+        console.log('Polly TTS audio received, size:', wavBuffer.length);
+        return wavBuffer;
         
     } catch (error) {
         console.error('TTS error:', error);
         return null;
     }
+}
+
+// Add this helper function after textToSpeech
+function createWavFromPCM(pcmBuffer, sampleRate = 16000) {
+    const wavBuffer = Buffer.alloc(44 + pcmBuffer.length);
+    
+    // WAV header
+    wavBuffer.write('RIFF', 0);
+    wavBuffer.writeUInt32LE(36 + pcmBuffer.length, 4);
+    wavBuffer.write('WAVE', 8);
+    wavBuffer.write('fmt ', 12);
+    wavBuffer.writeUInt32LE(16, 16); // fmt chunk size
+    wavBuffer.writeUInt16LE(1, 20); // PCM format
+    wavBuffer.writeUInt16LE(1, 22); // Mono
+    wavBuffer.writeUInt32LE(sampleRate, 24);
+    wavBuffer.writeUInt32LE(sampleRate * 2, 28); // byte rate
+    wavBuffer.writeUInt16LE(2, 32); // block align
+    wavBuffer.writeUInt16LE(16, 34); // bits per sample
+    wavBuffer.write('data', 36);
+    wavBuffer.writeUInt32LE(pcmBuffer.length, 40);
+    
+    // Copy PCM data
+    pcmBuffer.copy(wavBuffer, 44);
+    
+    return wavBuffer;
 }
 
 // Call Groq LLM for response
