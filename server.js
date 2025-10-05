@@ -276,7 +276,17 @@ async function processAudioChunk(ws, audioData) {
         const transcript = await transcribeAudio(wavBuffer);
         
         if (transcript && transcript.trim()) {
-            console.log('Transcript:', transcript);
+        // Filter out very short transcripts and common noise
+            const cleanTranscript = transcript.trim();
+            if (cleanTranscript.length < 5 || 
+                cleanTranscript.toLowerCase() === 'okay.' ||
+                cleanTranscript.toLowerCase() === 'thank you.' ||
+                cleanTranscript === '.') {
+                console.log('Ignoring short/noise transcript:', cleanTranscript);
+                return; // Skip processing
+    }
+    
+    console.log('Transcript:', transcript);
             
             // Send transcript to client
             ws.send(JSON.stringify({
