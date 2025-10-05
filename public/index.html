@@ -527,27 +527,12 @@
                     if (!isActive || !isConnected || !ws || ws.readyState !== WebSocket.OPEN) return;
                     
                     const inputData = e.inputBuffer.getChannelData(0);
+                    const outputData = new Int16Array(inputData.length);
                     
-                    // Resample if needed (mobile uses 48kHz, server expects 16kHz)
-                    let outputData;
-                    if (audioContext.sampleRate === 48000) {
-                        // Downsample from 48kHz to 16kHz (take every 3rd sample)
-                        const downsampled = new Float32Array(Math.floor(inputData.length / 3));
-                        for (let i = 0; i < downsampled.length; i++) {
-                            downsampled[i] = inputData[i * 3];
-                        }
-                        outputData = new Int16Array(downsampled.length);
-                        for (let i = 0; i < downsampled.length; i++) {
-                            const s = Math.max(-1, Math.min(1, downsampled[i]));
-                            outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                        }
-                    } else {
-                        // Original code for desktop
-                        outputData = new Int16Array(inputData.length);
-                        for (let i = 0; i < inputData.length; i++) {
-                            const s = Math.max(-1, Math.min(1, inputData[i]));
-                            outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-                        }
+                    // Convert float32 to int16
+                    for (let i = 0; i < inputData.length; i++) {
+                        const s = Math.max(-1, Math.min(1, inputData[i]));
+                        outputData[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
                     }
                     
                     // Send audio data via WebSocket
@@ -652,10 +637,50 @@
             }
         }
 
-        // Global audio element that persists
-        let globalAudioElement = null;
+        // iOS Audio Handler - Best Practice Implementation
+        let iosAudioContext = null;
+        let iosAudioUnlocked = false;
         
-        // Play audio chunk from server - iOS Safari Compatible
+        // Create iOS-specific audio context
+        function createIOSAudioContext() {
+            if (iosAudioContext) return;
+            
+            try {
+                // Create a separate audio context for playback
+                iosAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('iOS Audio context created');
+            } catch (e) {
+                console.error('Failed to create iOS audio context:', e);
+            }
+        }
+        
+        // Unlock iOS audio on user gesture
+        async function unlockIOSAudio() {
+            if (iosAudioUnlocked || !iosAudioContext) return;
+            
+            try {
+                // Create empty buffer
+                const buffer = iosAudioContext.createBuffer(1, 1, 22050);
+                const source = iosAudioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(iosAudioContext.destination);
+                
+                // Play silent buffer
+                source.start(0);
+                
+                // Resume if suspended
+                if (iosAudioContext.state === 'suspended') {
+                    await iosAudioContext.resume();
+                }
+                
+                iosAudioUnlocked = true;
+                console.log('iOS audio unlocked successfully');
+            } catch (e) {
+                console.error('iOS audio unlock failed:', e);
+            }
+        }
+        
+        // Play audio chunk from server - Best Practice for iOS
         async function playAudioChunk(audioData) {
             try {
                 console.log('playAudioChunk called');
@@ -670,129 +695,71 @@
                 const blob = new Blob([bytes], { type: 'audio/mp3' });
                 const url = URL.createObjectURL(blob);
                 
-                // Create audio element if it doesn't exist
-                if (!globalAudioElement) {
-                    globalAudioElement = new Audio();
-                    globalAudioElement.setAttribute('playsinline', 'true');
-                    document.body.appendChild(globalAudioElement);
+                // Stop any currently playing audio
+                if (currentAudio) {
+                    currentAudio.pause();
+                    currentAudio = null;
                 }
                 
-                // Set source and play
-                globalAudioElement.src = url;
+                // Create new audio element
+                currentAudio = new Audio();
+                currentAudio.src = url;
+                currentAudio.setAttribute('playsinline', 'true');
                 
-                // For iOS, we need to play in response to the NEXT user interaction
-                // Store the play action
-                const playAction = () => {
-                    globalAudioElement.play()
-                        .then(() => {
-                            console.log('Audio playing');
-                            // Remove the listener after playing
-                            document.removeEventListener('click', playAction);
-                            document.removeEventListener('touchstart', playAction);
-                        })
-                        .catch(e => console.error('Play failed:', e));
-                };
+                // Use Web Audio API for iOS if available
+                if (iosAudioContext && iosAudioUnlocked) {
+                    const source = iosAudioContext.createMediaElementSource(currentAudio);
+                    source.connect(iosAudioContext.destination);
+                }
                 
-                // Try to play immediately
-                globalAudioElement.play()
-                    .then(() => {
-                        console.log('Audio playing immediately');
-                    })
-                    .catch(e => {
-                        console.log('Immediate play failed, waiting for user interaction');
-                        // If immediate play fails, wait for any user interaction
-                        document.addEventListener('click', playAction, { once: true });
-                        document.addEventListener('touchstart', playAction, { once: true });
-                    });
+                // Play with promise handling
+                try {
+                    await currentAudio.play();
+                    console.log('Audio playing successfully');
+                } catch (playError) {
+                    console.error('Play error:', playError);
+                    
+                    // Retry once with user gesture context
+                    if (playError.name === 'NotAllowedError') {
+                        // Store audio for next user interaction
+                        window.pendingAudio = currentAudio;
+                        console.log('Audio queued for next user interaction');
+                    }
+                }
                 
                 // Cleanup
-                globalAudioElement.addEventListener('ended', () => {
+                currentAudio.addEventListener('ended', () => {
                     URL.revokeObjectURL(url);
-                }, { once: true });
-                
-            } catch (error) {
-                console.error('Error in playAudioChunk:', error);
-            }
-        }AAAAAAAAAAAAAAA';
-                iosAudio.volume = 0.01;
-                iosAudio.play().then(() => {
-                    audioInitialized = true;
-                    console.log('Audio element initialized');
-                }).catch(e => {
-                    console.error('Audio init failed:', e);
+                    currentAudio = null;
                 });
-            } catch (e) {
-                console.error('Failed to create audio element:', e);
-            }
-        }
-        
-        // Play audio chunk from server - Simplified for iOS
-        async function playAudioChunk(audioData) {
-            try {
-                console.log('playAudioChunk called');
-                
-                // Convert base64 to blob
-                const binaryString = atob(audioData.data);
-                const bytes = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                    bytes[i] = binaryString.charCodeAt(i);
-                }
-                
-                const blob = new Blob([bytes], { type: 'audio/mp3' });
-                const url = URL.createObjectURL(blob);
-                
-                // Use the pre-initialized audio element for iOS
-                if (iosAudio && audioInitialized) {
-                    iosAudio.src = url;
-                    iosAudio.volume = 1.0;
-                    
-                    const playPromise = iosAudio.play();
-                    if (playPromise !== undefined) {
-                        playPromise
-                            .then(() => {
-                                console.log('Audio playing successfully');
-                            })
-                            .catch(error => {
-                                console.error('Play error:', error);
-                            });
-                    }
-                    
-                    iosAudio.onended = () => {
-                        URL.revokeObjectURL(url);
-                    };
-                } else {
-                    // Fallback for desktop
-                    if (currentAudio) {
-                        currentAudio.pause();
-                        currentAudio = null;
-                    }
-                    
-                    currentAudio = new Audio(url);
-                    currentAudio.setAttribute('playsinline', 'true');
-                    currentAudio.play().catch(e => {
-                        console.error('Desktop audio play failed:', e);
-                    });
-                    
-                    currentAudio.addEventListener('ended', () => {
-                        URL.revokeObjectURL(url);
-                        currentAudio = null;
-                    });
-                }
                 
             } catch (error) {
                 console.error('Error in playAudioChunk:', error);
             }
         }
         
-        // Toggle conversation - Simplified
+        // Modified toggle conversation with iOS audio handling
         async function toggleConversation() {
             if (!isConnected || !audioContext) {
                 console.error('Not ready:', { isConnected, hasAudioContext: !!audioContext });
                 return;
             }
             
-            // Initialize audio on first click
-            initializeAudio();
+            // Create iOS audio context on first interaction
+            createIOSAudioContext();
+            
+            // Unlock iOS audio
+            await unlockIOSAudio();
+            
+            // Play any pending audio from previous attempt
+            if (window.pendingAudio) {
+                try {
+                    await window.pendingAudio.play();
+                    window.pendingAudio = null;
+                } catch (e) {
+                    console.log('Pending audio play failed:', e);
+                }
+            }
             
             isActive = !isActive;
             
