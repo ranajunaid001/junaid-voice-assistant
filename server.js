@@ -32,10 +32,6 @@ wss.on('connection', (ws) => {
     let transcriptionTimeout = null;
     
     // Send initial state
-    ws.send(JSON.stringify({
-        type: 'state',
-        state: 'idle'
-    }));
     
     // Handle incoming messages
     ws.on('message', async (message) => {
