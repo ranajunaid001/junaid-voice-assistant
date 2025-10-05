@@ -492,15 +492,31 @@
         // Initialize audio context and microphone
         async function initAudio() {
             try {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                mediaStream = await navigator.mediaDevices.getUserMedia({ 
+                // Check if mobile device
+                const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                
+                // Try to get ideal sample rate - mobile often needs 48000
+                const sampleRate = isMobile ? 48000 : 16000;
+                
+                audioContext = new (window.AudioContext || window.webkitAudioContext)({ sampleRate });
+                
+                // Mobile-friendly constraints
+                const constraints = isMobile ? {
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
+                } : {
                     audio: {
                         sampleRate: 16000,
                         channelCount: 1,
                         echoCancellation: true,
                         noiseSuppression: true
-                    } 
-                });
+                    }
+                };
+                
+                mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
                 
                 const source = audioContext.createMediaStreamSource(mediaStream);
                 processor = audioContext.createScriptProcessor(2048, 1, 1);
@@ -543,7 +559,7 @@
                 processor.connect(audioContext.destination);
                 
                 instruction.textContent = 'Click to start conversation';
-                console.log('Audio initialized successfully');
+                console.log(`Audio initialized successfully (sample rate: ${audioContext.sampleRate})`);
                 
             } catch (error) {
                 console.error('Error initializing audio:', error);
@@ -563,7 +579,7 @@
             }
         }
 
-        // Play audio chunk from server
+        // Play audio chunk from server - UPDATED FOR MOBILE
         async function playAudioChunk(audioData) {
             try {
                 // Stop any currently playing audio
@@ -584,7 +600,29 @@
                 
                 // Create and play audio
                 currentAudio = new Audio(url);
-                currentAudio.play();
+                
+                // Mobile-specific settings
+                currentAudio.setAttribute('playsinline', 'true');
+                currentAudio.setAttribute('preload', 'auto');
+                
+                // For mobile, we need to handle play() promise
+                const playPromise = currentAudio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            console.log('Audio playing successfully');
+                        })
+                        .catch(error => {
+                            console.error('Audio play failed:', error);
+                            // Try to play again after a small delay
+                            setTimeout(() => {
+                                if (currentAudio) {
+                                    currentAudio.play().catch(e => console.error('Retry failed:', e));
+                                }
+                            }, 100);
+                        });
+                }
                 
                 // Clean up when audio ends
                 currentAudio.addEventListener('ended', () => {
@@ -592,7 +630,7 @@
                     currentAudio = null;
                 });
                 
-                console.log('Playing TTS audio');
+                console.log('Audio setup complete');
             } catch (error) {
                 console.error('Error playing audio:', error);
                 currentAudio = null;
@@ -613,9 +651,11 @@
                 ws.send(JSON.stringify({ type: 'start' }));
                 instruction.textContent = 'Click to stop';
                 
-                // Resume audio context if suspended
+                // Resume audio context if suspended (important for mobile)
                 if (audioContext.state === 'suspended') {
-                    audioContext.resume();
+                    audioContext.resume().then(() => {
+                        console.log('Audio context resumed');
+                    });
                 }
             } else {
                 console.log('Stopping conversation');
