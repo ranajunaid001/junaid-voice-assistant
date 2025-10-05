@@ -106,8 +106,29 @@
             }
         }
 
+        /* Speaking animation - Breathing Blob */
         .orb.speaking {
             background: #5856D6;
+            animation: breathingBlob 3s ease-in-out infinite;
+        }
+
+        @keyframes breathingBlob {
+            0%, 100% { 
+                border-radius: 50%;
+                transform: scale(1);
+            }
+            25% { 
+                border-radius: 45% 55% 52% 48% / 48% 52% 48% 52%;
+                transform: scale(1.1);
+            }
+            50% { 
+                border-radius: 55% 45% 48% 52% / 52% 48% 52% 48%;
+                transform: scale(0.9);
+            }
+            75% { 
+                border-radius: 48% 52% 55% 45% / 45% 55% 45% 55%;
+                transform: scale(1.05);
+            }
         }
 
         .orb.listening::before,
