@@ -74,9 +74,9 @@ wss.on('connection', (ws) => {
                         // Add audio data to buffer
                         audioBuffer.push(...data.data);
                         
-                        // Process audio in chunks (every 1 second of audio)
-                        if (audioBuffer.length >= 32000) { // ~1 second at 16kHz
-                            processAudioChunk(ws, audioBuffer.splice(0, 32000));
+                        // Only process if buffer is getting too large (safety limit)
+                        if (audioBuffer.length >= 160000) { // ~10 seconds at 16kHz
+                            processAudioChunk(ws, audioBuffer.splice(0, 160000));
                         }
                         
                         // Set timeout to process remaining audio
@@ -87,7 +87,7 @@ wss.on('connection', (ws) => {
                             if (audioBuffer.length > 0) {
                                 processAudioChunk(ws, audioBuffer.splice(0));
                             }
-                        }, 1000); // Process after 300ms of silence
+                        }, 2000); // Wait 2 seconds of silence
                     }
                     break;
                     
@@ -276,7 +276,7 @@ async function processAudioChunk(ws, audioData) {
         const transcript = await transcribeAudio(wavBuffer);
         
         if (transcript && transcript.trim()) {
-        // Filter out very short transcripts and common noise
+            // Filter out very short transcripts and common noise
             const cleanTranscript = transcript.trim();
             if (cleanTranscript.length < 5 || 
                 cleanTranscript.toLowerCase() === 'okay.' ||
@@ -284,9 +284,9 @@ async function processAudioChunk(ws, audioData) {
                 cleanTranscript === '.') {
                 console.log('Ignoring short/noise transcript:', cleanTranscript);
                 return; // Skip processing
-    }
-    
-    console.log('Transcript:', transcript);
+            }
+            
+            console.log('Transcript:', transcript);
             
             // Send transcript to client
             ws.send(JSON.stringify({
@@ -315,9 +315,9 @@ async function processAudioChunk(ws, audioData) {
                 type: 'state',
                 state: 'speaking'
             }));
-
+            
             // Stop capturing audio while speaking
-            isActive = false;  // ADD THIS LINE
+            isActive = false;
             
             // Generate TTS audio
             const audioBuffer = await textToSpeech(llmResponse);
@@ -337,7 +337,7 @@ async function processAudioChunk(ws, audioData) {
                 type: 'state',
                 state: 'listening'
             }));
-            isActive = true;  // ADD THIS LINE
+            isActive = true;
         }
         
     } catch (error) {
