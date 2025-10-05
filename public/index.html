@@ -428,6 +428,8 @@
                     break;
                     
                 case 'command':
+                    // Interruption detection disabled for testing
+                    /*
                     if (data.action === 'stopAudio') {
                         // Stop current audio
                         if (currentAudio) {
@@ -436,6 +438,7 @@
                         }
                         console.log('Audio playback stopped due to interruption');
                     }
+                    */
                     break;
             }
         }
@@ -600,29 +603,16 @@
                 
                 // Create and play audio
                 currentAudio = new Audio(url);
-                
-                // Mobile-specific settings
                 currentAudio.setAttribute('playsinline', 'true');
-                currentAudio.setAttribute('preload', 'auto');
                 
-                // For mobile, we need to handle play() promise
-                const playPromise = currentAudio.play();
-                
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            console.log('Audio playing successfully');
-                        })
-                        .catch(error => {
-                            console.error('Audio play failed:', error);
-                            // Try to play again after a small delay
-                            setTimeout(() => {
-                                if (currentAudio) {
-                                    currentAudio.play().catch(e => console.error('Retry failed:', e));
-                                }
-                            }, 100);
-                        });
-                }
+                // Just try to play once - no retries
+                currentAudio.play()
+                    .then(() => {
+                        console.log('Audio playing successfully');
+                    })
+                    .catch(error => {
+                        console.error('Audio play failed:', error);
+                    });
                 
                 // Clean up when audio ends
                 currentAudio.addEventListener('ended', () => {
@@ -630,7 +620,6 @@
                     currentAudio = null;
                 });
                 
-                console.log('Audio setup complete');
             } catch (error) {
                 console.error('Error playing audio:', error);
                 currentAudio = null;
