@@ -652,50 +652,35 @@
             }
         }
 
-        // iOS Audio Handler - Best Practice Implementation
-        let iosAudioContext = null;
-        let iosAudioUnlocked = false;
+        // Single audio element for iOS - initialized on user gesture
+        let iosAudio = null;
+        let audioInitialized = false;
         
-        // Create iOS-specific audio context
-        function createIOSAudioContext() {
-            if (iosAudioContext) return;
+        // Initialize audio element on first user interaction
+        function initializeAudio() {
+            if (audioInitialized) return;
             
             try {
-                // Create a separate audio context for playback
-                iosAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-                console.log('iOS Audio context created');
+                // Create a single audio element that iOS will trust
+                iosAudio = new Audio();
+                iosAudio.setAttribute('playsinline', 'true');
+                iosAudio.setAttribute('preload', 'auto');
+                
+                // Play silence to establish user gesture
+                iosAudio.src = 'data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA';
+                iosAudio.volume = 0.01;
+                iosAudio.play().then(() => {
+                    audioInitialized = true;
+                    console.log('Audio element initialized');
+                }).catch(e => {
+                    console.error('Audio init failed:', e);
+                });
             } catch (e) {
-                console.error('Failed to create iOS audio context:', e);
+                console.error('Failed to create audio element:', e);
             }
         }
         
-        // Unlock iOS audio on user gesture
-        async function unlockIOSAudio() {
-            if (iosAudioUnlocked || !iosAudioContext) return;
-            
-            try {
-                // Create empty buffer
-                const buffer = iosAudioContext.createBuffer(1, 1, 22050);
-                const source = iosAudioContext.createBufferSource();
-                source.buffer = buffer;
-                source.connect(iosAudioContext.destination);
-                
-                // Play silent buffer
-                source.start(0);
-                
-                // Resume if suspended
-                if (iosAudioContext.state === 'suspended') {
-                    await iosAudioContext.resume();
-                }
-                
-                iosAudioUnlocked = true;
-                console.log('iOS audio unlocked successfully');
-            } catch (e) {
-                console.error('iOS audio unlock failed:', e);
-            }
-        }
-        
-        // Play audio chunk from server - Best Practice for iOS
+        // Play audio chunk from server - Simplified for iOS
         async function playAudioChunk(audioData) {
             try {
                 console.log('playAudioChunk called');
@@ -710,72 +695,58 @@
                 const blob = new Blob([bytes], { type: 'audio/mp3' });
                 const url = URL.createObjectURL(blob);
                 
-                // Stop any currently playing audio
-                if (currentAudio) {
-                    currentAudio.pause();
-                    currentAudio = null;
-                }
-                
-                // Create new audio element
-                currentAudio = new Audio();
-                currentAudio.src = url;
-                currentAudio.setAttribute('playsinline', 'true');
-                
-                // Use Web Audio API for iOS if available
-                if (iosAudioContext && iosAudioUnlocked) {
-                    const source = iosAudioContext.createMediaElementSource(currentAudio);
-                    source.connect(iosAudioContext.destination);
-                }
-                
-                // Play with promise handling
-                try {
-                    await currentAudio.play();
-                    console.log('Audio playing successfully');
-                } catch (playError) {
-                    console.error('Play error:', playError);
+                // Use the pre-initialized audio element for iOS
+                if (iosAudio && audioInitialized) {
+                    iosAudio.src = url;
+                    iosAudio.volume = 1.0;
                     
-                    // Retry once with user gesture context
-                    if (playError.name === 'NotAllowedError') {
-                        // Store audio for next user interaction
-                        window.pendingAudio = currentAudio;
-                        console.log('Audio queued for next user interaction');
+                    const playPromise = iosAudio.play();
+                    if (playPromise !== undefined) {
+                        playPromise
+                            .then(() => {
+                                console.log('Audio playing successfully');
+                            })
+                            .catch(error => {
+                                console.error('Play error:', error);
+                            });
                     }
+                    
+                    iosAudio.onended = () => {
+                        URL.revokeObjectURL(url);
+                    };
+                } else {
+                    // Fallback for desktop
+                    if (currentAudio) {
+                        currentAudio.pause();
+                        currentAudio = null;
+                    }
+                    
+                    currentAudio = new Audio(url);
+                    currentAudio.setAttribute('playsinline', 'true');
+                    currentAudio.play().catch(e => {
+                        console.error('Desktop audio play failed:', e);
+                    });
+                    
+                    currentAudio.addEventListener('ended', () => {
+                        URL.revokeObjectURL(url);
+                        currentAudio = null;
+                    });
                 }
-                
-                // Cleanup
-                currentAudio.addEventListener('ended', () => {
-                    URL.revokeObjectURL(url);
-                    currentAudio = null;
-                });
                 
             } catch (error) {
                 console.error('Error in playAudioChunk:', error);
             }
         }
         
-        // Modified toggle conversation with iOS audio handling
+        // Toggle conversation - Simplified
         async function toggleConversation() {
             if (!isConnected || !audioContext) {
                 console.error('Not ready:', { isConnected, hasAudioContext: !!audioContext });
                 return;
             }
             
-            // Create iOS audio context on first interaction
-            createIOSAudioContext();
-            
-            // Unlock iOS audio
-            await unlockIOSAudio();
-            
-            // Play any pending audio from previous attempt
-            if (window.pendingAudio) {
-                try {
-                    await window.pendingAudio.play();
-                    window.pendingAudio = null;
-                    console.log('Played queued audio');
-                } catch (e) {
-                    console.log('Queued audio play failed:', e);
-                }
-            }
+            // Initialize audio on first click
+            initializeAudio();
             
             isActive = !isActive;
             
@@ -794,17 +765,6 @@
                 console.log('Stopping conversation');
                 ws.send(JSON.stringify({ type: 'stop' }));
                 instruction.textContent = 'Click to start conversation';
-                
-                // Also try to play pending audio when stopping
-                if (window.pendingAudio) {
-                    try {
-                        await window.pendingAudio.play();
-                        window.pendingAudio = null;
-                        console.log('Played queued audio on stop');
-                    } catch (e) {
-                        console.log('Stop: queued audio play failed:', e);
-                    }
-                }
             }
         }
 
