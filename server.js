@@ -363,7 +363,7 @@ async function googleTextToSpeech(text) {
             voice: {
                 languageCode: 'en-US',
                 name: ttsConfig.googleVoice,
-                model_name: ttsConfig.googleModel
+                modelName: ttsConfig.googleModel  // Changed to camelCase
             },
             audioConfig: {
                 audioEncoding: 'MP3'
@@ -371,6 +371,8 @@ async function googleTextToSpeech(text) {
         };
         
         console.log('Sending request to Google TTS...');
+        console.log('Full request:', JSON.stringify(request, null, 2));
+        
         const [response] = await googleTTSClient.synthesizeSpeech(request);
         console.log('Got response from Google TTS');
         
