@@ -637,12 +637,32 @@
             }
         }
 
+        // Audio unlock for iOS
+        let audioUnlocked = false;
+        async function unlockAudio() {
+            if (audioUnlocked) return;
+            
+            try {
+                // Create and play a silent audio to unlock audio playback
+                const silentAudio = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjQ1LjEwMAAAAAAAAAAAAAAA');
+                silentAudio.volume = 0.1;
+                await silentAudio.play();
+                audioUnlocked = true;
+                console.log('Audio unlocked for iOS');
+            } catch (e) {
+                console.log('Audio unlock failed:', e);
+            }
+        }
+
         // Toggle conversation
-        function toggleConversation() {
+        async function toggleConversation() {
             if (!isConnected || !audioContext) {
                 console.error('Not ready:', { isConnected, hasAudioContext: !!audioContext });
                 return;
             }
+            
+            // Unlock audio on first interaction (iOS fix)
+            await unlockAudio();
             
             isActive = !isActive;
             
