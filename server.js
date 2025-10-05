@@ -46,7 +46,9 @@ let ttsConfig = {
 const availableVoices = {
     aws: {
         'Stephen': { gender: 'Male', engine: 'generative' },
-        'Ruth': { gender: 'Female', engine: 'generative' }
+        'Ruth': { gender: 'Female', engine: 'generative' },
+        'Matthew': { gender: 'Male', engine: 'neural' },  // Matthew doesn't support generative
+        'Joanna': { gender: 'Female', engine: 'neural' }  // Joanna doesn't support generative
     },
     google: {
         'Enceladus': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
@@ -311,12 +313,15 @@ async function awsTextToSpeech(text) {
     try {
         console.log(`Calling Amazon Polly TTS (${ttsConfig.awsVoice}) with:`, text.substring(0, 50) + '...');
         
+        // Get voice configuration
+        const voiceConfig = availableVoices.aws[ttsConfig.awsVoice];
+        
         const params = {
             Text: text,
             OutputFormat: 'mp3',
             VoiceId: ttsConfig.awsVoice,
             SampleRate: '24000',
-            Engine: 'generative'
+            Engine: voiceConfig.engine  // Use the engine specified for this voice
         };
         
         const command = new SynthesizeSpeechCommand(params);
@@ -329,7 +334,7 @@ async function awsTextToSpeech(text) {
         }
         const audioBuffer = Buffer.concat(chunks);
         
-        console.log('Polly TTS audio received (MP3), size:', audioBuffer.length);
+        console.log(`Polly TTS audio received (${voiceConfig.engine} engine, MP3), size:`, audioBuffer.length);
         
         return audioBuffer;
         
