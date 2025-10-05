@@ -405,6 +405,9 @@
                 
                 source.connect(processor);
                 // Don't connect to destination to avoid echo
+                source.connect(processor);
+                processor.connect(audioContext.destination);
+                audioContext.destination.channelCount = 0;  // Mute output to avoid echo
                 
                 instruction.textContent = 'Click to start conversation';
                 console.log('Audio initialized successfully');
