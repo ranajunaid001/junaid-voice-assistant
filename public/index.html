@@ -301,22 +301,13 @@
         <div class="instruction" id="instruction">Click to start conversation</div>
         
         <div class="voice-controls">
-            <div class="voice-select-group" id="awsGroup">
-                <label for="awsVoice">Amazon Polly Voice</label>
+            <div class="voice-select-group">
+                <label for="awsVoice">Select Voice</label>
                 <select id="awsVoice">
                     <option value="Stephen">Stephen (Male - Generative)</option>
                     <option value="Ruth" selected>Ruth (Female - Generative)</option>
                     <option value="Matthew">Matthew (Male - Neural)</option>
                     <option value="Joanna">Joanna (Female - Neural)</option>
-                </select>
-            </div>
-            <div class="voice-select-group" id="googleGroup">
-                <label for="googleVoice">Google Gemini Voice</label>
-                <select id="googleVoice">
-                    <option value="Enceladus">Enceladus (Male)</option>
-                    <option value="Aoede" selected>Aoede (Female)</option>
-                    <option value="Schedar">Schedar (Male)</option>
-                    <option value="Umbriel">Umbriel (Male)</option>
                 </select>
             </div>
         </div>
@@ -674,7 +665,6 @@
         // Initialize
         connectWebSocket();
         initAudio();
-        updateActiveService();
 
         // Show initializing state
         status.textContent = 'Initializing';
