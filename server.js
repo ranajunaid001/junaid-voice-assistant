@@ -2,11 +2,17 @@ const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const fetch = require('node-fetch');
+const FormData = require('form-data');
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
+
+// Groq configuration
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/audio/transcriptions';
 
 // Serve static files
 app.use(express.static('public'));
@@ -45,6 +51,12 @@ wss.on('connection', (ws) => {
                         type: 'state',
                         state: 'listening'
                     }));
+                    // Send debug message to UI
+                    ws.send(JSON.stringify({
+                        type: 'transcript',
+                        text: '[Debug] Listening started...',
+                        final: false
+                    }));
                     break;
                     
                 case 'stop':
@@ -62,6 +74,18 @@ wss.on('connection', (ws) => {
                     
                 case 'audio':
                     if (isActive && data.data) {
+                        // Debug: Log that audio is received
+                        console.log(`Received audio data: ${data.data.length} samples`);
+                        
+                        // Send debug to UI every 10th message
+                        if (Math.random() < 0.1) {
+                            ws.send(JSON.stringify({
+                                type: 'transcript',
+                                text: `[Debug] Receiving audio... buffer: ${audioBuffer.length}`,
+                                final: false
+                            }));
+                        }
+                        
                         // Add audio data to buffer
                         audioBuffer.push(...data.data);
                         
@@ -99,37 +123,124 @@ wss.on('connection', (ws) => {
     });
 });
 
-// Process audio chunk (placeholder for now)
+// Convert Int16Array to WAV format
+function createWavFile(audioData, sampleRate = 16000) {
+    const length = audioData.length;
+    const buffer = new ArrayBuffer(44 + length * 2);
+    const view = new DataView(buffer);
+    
+    // WAV header
+    const writeString = (offset, string) => {
+        for (let i = 0; i < string.length; i++) {
+            view.setUint8(offset + i, string.charCodeAt(i));
+        }
+    };
+    
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + length * 2, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeString(36, 'data');
+    view.setUint32(40, length * 2, true);
+    
+    // Audio data
+    let offset = 44;
+    for (let i = 0; i < length; i++) {
+        view.setInt16(offset, audioData[i], true);
+        offset += 2;
+    }
+    
+    return Buffer.from(buffer);
+}
+
+// Transcribe audio using Groq Whisper
+async function transcribeAudio(audioBuffer) {
+    try {
+        console.log('Calling Groq API with audio buffer size:', audioBuffer.length);
+        
+        const form = new FormData();
+        form.append('file', audioBuffer, {
+            filename: 'audio.wav',
+            contentType: 'audio/wav'
+        });
+        form.append('model', 'whisper-large-v3');
+        form.append('response_format', 'json');
+        form.append('language', 'en');
+        
+        const response = await fetch(GROQ_API_URL, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GROQ_API_KEY}`,
+                ...form.getHeaders()
+            },
+            body: form
+        });
+        
+        if (!response.ok) {
+            const error = await response.text();
+            console.error('Groq API error response:', error);
+            throw new Error(`Groq API error: ${response.status} - ${error}`);
+        }
+        
+        const data = await response.json();
+        console.log('Groq response:', data);
+        return data.text;
+        
+    } catch (error) {
+        console.error('Transcription error:', error);
+        throw error;
+    }
+}
+
+// Process audio chunk with real Whisper
 async function processAudioChunk(ws, audioData) {
     try {
         console.log(`Processing audio chunk: ${audioData.length} samples`);
         
-        // For now, just send back a mock transcript
-        // TODO: Integrate with Whisper API
-        ws.send(JSON.stringify({
-            type: 'transcript',
-            text: 'Hello, I heard you speaking...',
-            final: false
-        }));
+        // Convert audio data to WAV format
+        const audioArray = new Int16Array(audioData);
+        const wavBuffer = createWavFile(audioArray);
         
-        // Simulate processing
-        ws.send(JSON.stringify({
-            type: 'state',
-            state: 'processing'
-        }));
+        // Send to Groq Whisper
+        const transcript = await transcribeAudio(wavBuffer);
         
-        // After a delay, send mock response
-        setTimeout(() => {
+        if (transcript && transcript.trim()) {
+            console.log('Transcript:', transcript);
+            
+            // Send transcript to client
             ws.send(JSON.stringify({
-                type: 'response',
-                text: 'This is a test response. Whisper integration coming next!'
+                type: 'transcript',
+                text: transcript,
+                final: true
             }));
             
+            // Update state
             ws.send(JSON.stringify({
                 type: 'state',
-                state: 'listening'
+                state: 'processing'
             }));
-        }, 1000);
+            
+            // For now, just echo back the transcript
+            // TODO: Add LLM processing here
+            setTimeout(() => {
+                ws.send(JSON.stringify({
+                    type: 'response',
+                    text: `I heard you say: "${transcript}"`
+                }));
+                
+                ws.send(JSON.stringify({
+                    type: 'state',
+                    state: 'listening'
+                }));
+            }, 500);
+        }
         
     } catch (error) {
         console.error('Error processing audio:', error);
