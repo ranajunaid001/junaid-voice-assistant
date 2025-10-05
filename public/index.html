@@ -54,81 +54,16 @@
             transition: all 0.6s;
         }
 
-        /* Sky animation for listening state */
-        .orb.listening {
-            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 50%, #87CEEB 100%);
-            animation: skyGradient 3s ease-in-out infinite;
-        }
-
-        .orb.listening::after {
-            content: '';
-            position: absolute;
-            width: 200%;
-            height: 100%;
-            top: 0;
-            left: -100%;
-            background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120"><g fill="white" opacity="0.4"><ellipse cx="40" cy="40" rx="40" ry="20"/><ellipse cx="120" cy="30" rx="50" ry="25"/><ellipse cx="180" cy="50" rx="35" ry="18"/><ellipse cx="80" cy="80" rx="45" ry="22"/></g></svg>') repeat-x;
-            background-size: 200px 120px;
-            animation: clouds 20s linear infinite;
-        }
-
-        @keyframes skyGradient {
-            0%, 100% {
-                background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 50%, #87CEEB 100%);
-            }
-            50% {
-                background: linear-gradient(to bottom, #5DADE2 0%, #87CEEB 50%, #5DADE2 100%);
-            }
-        }
-
-        @keyframes clouds {
-            0% {
-                transform: translateX(0);
-            }
-            100% {
-                transform: translateX(100%);
-            }
-        }
-
         .orb.connected {
             background: #007AFF;
-            animation: gentleGlow 4s ease-in-out infinite;
         }
 
-        @keyframes gentleGlow {
-            0%, 100% {
-                background: #007AFF;
-                box-shadow: 0 0 20px rgba(0, 122, 255, 0.3);
-            }
-            50% {
-                background: #0051D5;
-                box-shadow: 0 0 30px rgba(0, 122, 255, 0.5);
-            }
+        .orb.listening {
+            background: #34C759;
         }
 
-        /* Speaking animation - Breathing Blob */
         .orb.speaking {
             background: #5856D6;
-            animation: breathingBlob 3s ease-in-out infinite;
-        }
-
-        @keyframes breathingBlob {
-            0%, 100% { 
-                border-radius: 50%;
-                transform: scale(1);
-            }
-            25% { 
-                border-radius: 45% 55% 52% 48% / 48% 52% 48% 52%;
-                transform: scale(1.1);
-            }
-            50% { 
-                border-radius: 55% 45% 48% 52% / 52% 48% 52% 48%;
-                transform: scale(0.9);
-            }
-            75% { 
-                border-radius: 48% 52% 55% 45% / 45% 55% 45% 55%;
-                transform: scale(1.05);
-            }
         }
 
         .orb.listening::before,
@@ -322,13 +257,20 @@
         <div class="instruction" id="instruction">Click to start conversation</div>
         
         <div class="voice-controls">
-            <div class="voice-select-group">
-                <label for="awsVoice">Select Voice</label>
+            <div class="voice-select-group" id="awsGroup">
+                <label for="awsVoice">Amazon Polly Voice</label>
                 <select id="awsVoice">
-                    <option value="Stephen">Stephen (Male - Generative)</option>
-                    <option value="Ruth" selected>Ruth (Female - Generative)</option>
-                    <option value="Matthew">Matthew (Male - Neural)</option>
-                    <option value="Joanna">Joanna (Female - Neural)</option>
+                    <option value="Stephen">Stephen (Male)</option>
+                    <option value="Ruth">Ruth (Female)</option>
+                </select>
+            </div>
+            <div class="voice-select-group" id="googleGroup">
+                <label for="googleVoice">Google Gemini Voice</label>
+                <select id="googleVoice">
+                    <option value="Enceladus" selected>Enceladus (Male)</option>
+                    <option value="Aoede">Aoede (Female)</option>
+                    <option value="Schedar">Schedar (Male)</option>
+                    <option value="Umbriel">Umbriel (Male)</option>
                 </select>
             </div>
         </div>
@@ -354,9 +296,9 @@
         let isActive = false;
         let currentAudio = null;
         let ttsConfig = {
-            service: 'aws',
-            awsVoice: 'Ruth',
-            googleVoice: 'Aoede',
+            service: 'google',
+            awsVoice: 'Stephen',
+            googleVoice: 'Enceladus',
             googleModel: 'gemini-2.5-flash-tts'
         };
 
@@ -686,6 +628,7 @@
         // Initialize
         connectWebSocket();
         initAudio();
+        updateActiveService();
 
         // Show initializing state
         status.textContent = 'Initializing';
