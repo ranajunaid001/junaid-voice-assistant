@@ -295,7 +295,7 @@
                     break;
                 
                 case 'audio':
-                    playAudioChunk(data.audio);
+                    playAudioChunk(data);
                     break;
                 
                 case 'state':
@@ -405,9 +405,6 @@
                 
                 source.connect(processor);
                 // Don't connect to destination to avoid echo
-                source.connect(processor);
-                processor.connect(audioContext.destination);
-                
                 
                 instruction.textContent = 'Click to start conversation';
                 console.log('Audio initialized successfully');
@@ -431,10 +428,31 @@
         }
 
         // Play audio chunk from server
-        function playAudioChunk(audioData) {
-            // This is a placeholder - you'll need to implement audio playback
-            // based on the format you receive from the server
-            console.log('Received audio chunk');
+        async function playAudioChunk(audioData) {
+            try {
+                // Convert base64 to blob
+                const binaryString = atob(audioData.data);
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                
+                const blob = new Blob([bytes], { type: 'audio/wav' });
+                const url = URL.createObjectURL(blob);
+                
+                // Create and play audio
+                const audio = new Audio(url);
+                audio.play();
+                
+                // Clean up
+                audio.addEventListener('ended', () => {
+                    URL.revokeObjectURL(url);
+                });
+                
+                console.log('Playing TTS audio');
+            } catch (error) {
+                console.error('Error playing audio:', error);
+            }
         }
 
         // Toggle conversation
