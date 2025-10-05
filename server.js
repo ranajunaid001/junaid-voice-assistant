@@ -500,9 +500,12 @@ async function processAudioChunk(ws, audioData) {
             }));
             
             // Get LLM response
+            console.log('Getting LLM response...');
             const llmResponse = await getLLMResponse(transcript);
+            console.log('LLM response received');
             
             // Send LLM response text
+            console.log('Sending response to client...');
             ws.send(JSON.stringify({
                 type: 'response',
                 text: llmResponse
@@ -519,16 +522,21 @@ async function processAudioChunk(ws, audioData) {
             ws.setIsActive(false);
             
             // Generate TTS audio using selected service
+            console.log(`Calling TTS router with service: ${ttsConfig.service}`);
             const audioBuffer = await textToSpeechRouter(llmResponse);
+            console.log('TTS router returned, audioBuffer:', audioBuffer ? 'exists' : 'null');
             
             if (audioBuffer) {
                 // Send audio as base64
                 const audioBase64 = audioBuffer.toString('base64');
+                console.log('Sending audio to client, size:', audioBase64.length);
                 ws.send(JSON.stringify({
                     type: 'audio',
                     data: audioBase64,
                     format: 'mp3'  // Both services output MP3
                 }));
+            } else {
+                console.error('No audio buffer returned from TTS');
             }
             
             // Back to listening
