@@ -1,18 +1,4 @@
-// Google Cloud Text-to-Speech with Gemini-TTS
-async function googleTextToSpeech(text) {
-    try {
-        console.log(`Calling Google Gemini-TTS (${ttsConfig.googleVoice}) with:`, text.substring(0, 50) + '...');
-        
-        // Try with camelCase for Node.js SDK
-        const request = {
-            input: { 
-                text: text,
-                prompt: "You are having a friendly conversation. Speak naturally and conversationally."
-            },
-            voice: {
-                languageCode: 'en-US',
-                name: ttsConfig.googleVoice,
-                modelName: ttsConfig.googleModel  // Try caconst express = require('express');
+const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
@@ -61,8 +47,8 @@ const availableVoices = {
     aws: {
         'Stephen': { gender: 'Male', engine: 'generative' },
         'Ruth': { gender: 'Female', engine: 'generative' },
-        'Matthew': { gender: 'Male', engine: 'neural' },  // Matthew doesn't support generative
-        'Joanna': { gender: 'Female', engine: 'neural' }  // Joanna doesn't support generative
+        'Matthew': { gender: 'Male', engine: 'neural' },
+        'Joanna': { gender: 'Female', engine: 'neural' }
     },
     google: {
         'Enceladus': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
