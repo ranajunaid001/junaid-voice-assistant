@@ -260,15 +260,17 @@
             <div class="voice-select-group" id="awsGroup">
                 <label for="awsVoice">Amazon Polly Voice</label>
                 <select id="awsVoice">
-                    <option value="Stephen">Stephen (Male)</option>
-                    <option value="Ruth">Ruth (Female)</option>
+                    <option value="Stephen">Stephen (Male - Generative)</option>
+                    <option value="Ruth" selected>Ruth (Female - Generative)</option>
+                    <option value="Matthew">Matthew (Male - Neural)</option>
+                    <option value="Joanna">Joanna (Female - Neural)</option>
                 </select>
             </div>
             <div class="voice-select-group" id="googleGroup">
                 <label for="googleVoice">Google Gemini Voice</label>
                 <select id="googleVoice">
-                    <option value="Enceladus" selected>Enceladus (Male)</option>
-                    <option value="Aoede">Aoede (Female)</option>
+                    <option value="Enceladus">Enceladus (Male)</option>
+                    <option value="Aoede" selected>Aoede (Female)</option>
                     <option value="Schedar">Schedar (Male)</option>
                     <option value="Umbriel">Umbriel (Male)</option>
                 </select>
@@ -296,9 +298,9 @@
         let isActive = false;
         let currentAudio = null;
         let ttsConfig = {
-            service: 'google',
-            awsVoice: 'Stephen',
-            googleVoice: 'Enceladus',
+            service: 'aws',
+            awsVoice: 'Ruth',
+            googleVoice: 'Aoede',
             googleModel: 'gemini-2.5-flash-tts'
         };
 
