@@ -355,12 +355,12 @@ async function googleTextToSpeech(text) {
                 prompt: "You are having a friendly conversation. Speak naturally and conversationally."
             },
             voice: {
-                languageCode: 'en-US',
+                language_code: 'en-US',  // Using snake_case as shown in docs
                 name: ttsConfig.googleVoice,
-                model_name: ttsConfig.googleModel  // Changed from 'model' to 'model_name'
+                model_name: ttsConfig.googleModel  // Using snake_case as shown in docs
             },
-            audioConfig: {
-                audioEncoding: 'MP3'
+            audio_config: {
+                audio_encoding: 'MP3'  // This might need to be an enum value
             }
         };
         
@@ -373,6 +373,7 @@ async function googleTextToSpeech(text) {
         
     } catch (error) {
         console.error('Google TTS error:', error);
+        console.error('Request was:', JSON.stringify(request, null, 2));
         return null;
     }
 }
