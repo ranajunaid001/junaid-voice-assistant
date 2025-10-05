@@ -236,7 +236,7 @@ async function textToSpeech(text) {
             Text: text,
             OutputFormat: 'pcm',
             VoiceId: 'Stephen', // or 'Ruth' - these support Generative
-            SampleRate: '24000',
+            SampleRate: '22050',
             Engine: 'generative' // Better quality voice
         };
         
@@ -251,7 +251,7 @@ async function textToSpeech(text) {
         const audioBuffer = Buffer.concat(chunks);
         
         // Convert PCM to WAV
-        const wavBuffer = createWavFromPCM(audioBuffer, 16000);
+        const wavBuffer = createWavFromPCM(audioBuffer, 22050);
         
         console.log('Polly TTS audio received, size:', wavBuffer.length);
         return wavBuffer;
