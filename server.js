@@ -38,8 +38,8 @@ const googleTTSClient = new textToSpeech.TextToSpeechClient({
 let ttsConfig = {
     service: 'google',  // 'aws' or 'google' - changed to google as default
     awsVoice: 'Stephen',  // AWS Polly voice
-    googleVoice: 'en-US-Neural2-D',  // Google TTS voice (not Gemini)
-    googleModel: 'neural2'  // Standard Google TTS model
+    googleVoice: 'Aoede',  // Google Gemini-TTS voice - female
+    googleModel: 'gemini-2.5-flash-tts'  // Gemini TTS model
 };
 
 // Available voices configuration
@@ -51,10 +51,10 @@ const availableVoices = {
         'Joanna': { gender: 'Female', engine: 'neural' }
     },
     google: {
-        'en-US-Neural2-D': { gender: 'Male', type: 'Neural2' },
-        'en-US-Neural2-F': { gender: 'Female', type: 'Neural2' },
-        'en-US-Journey-D': { gender: 'Male', type: 'Journey' },
-        'en-US-Journey-F': { gender: 'Female', type: 'Journey' }
+        'Enceladus': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
+        'Aoede': { gender: 'Female', model: 'gemini-2.5-flash-tts' },
+        'Schedar': { gender: 'Male', model: 'gemini-2.5-flash-tts' },
+        'Umbriel': { gender: 'Male', model: 'gemini-2.5-flash-tts' }
     }
 };
 
